@@ -1,4 +1,4 @@
-name: Add Google Calendar OAuth UI
+name: Wire Google Calendar sync UI
 
 on:
   push:
@@ -16,83 +16,31 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Patch index.html
+      - name: Load enhanced calendar integration
         run: |
           python - <<'PY'
           from pathlib import Path
 
           p = Path('index.html')
           s = p.read_text()
+          tag = '<script src="calendar-sync.js?v=20260915"></script>'
 
-          old = '<button id="manageBtn" class="btn secondary" style="display:none">Tasks</button><button id="addEventBtn" class="btn secondary" style="display:none">+ Event</button><button id="addTaskBtn" class="btn secondary" style="display:none">+ Task</button>'
-          new = '<button id="calendarBtn" class="btn secondary" style="display:none">Connect Calendar</button><button id="manageBtn" class="btn secondary" style="display:none">Tasks</button><button id="addEventBtn" class="btn secondary" style="display:none">+ Event</button><button id="addTaskBtn" class="btn secondary" style="display:none">+ Task</button>'
-          if old not in s:
-              raise SystemExit('Topbar target not found')
-          s = s.replace(old, new, 1)
+          # Remove an older injected version if this workflow is rerun.
+          import re
+          s = re.sub(r'\n?<script src="calendar-sync\.js(?:\?v=[^"]*)?"></script>', '', s)
 
-          old = "manageBtn=$('manageBtn'),authModal=$('authModal')"
-          new = "manageBtn=$('manageBtn'),calendarBtn=$('calendarBtn'),authModal=$('authModal')"
-          if old not in s:
-              raise SystemExit('Variable target not found')
-          s = s.replace(old, new, 1)
+          if '</body>' not in s:
+              raise SystemExit('Could not find </body> in index.html')
 
-          old = "[addTaskBtn,addEventBtn,manageBtn].forEach(b=>b.style.display=on?'inline-block':'none')"
-          new = "[addTaskBtn,addEventBtn,manageBtn,calendarBtn].forEach(b=>b.style.display=on?'inline-block':'none')"
-          if old not in s:
-              raise SystemExit('Auth UI target not found')
-          s = s.replace(old, new, 1)
-
-          marker = "[authModal,taskModal,eventModal,manageModal].forEach(m=>m.onclick=e=>{if(e.target===m)m.classList.remove('open')});"
-          if marker not in s:
-              raise SystemExit('Insertion marker not found')
-
-          block = r'''
-calendarBtn.onclick=async()=>{
-  if(!currentUser){openAuth('login');return}
-  calendarBtn.disabled=true;
-  calendarBtn.textContent='Connecting…';
-  try{
-    const {data,error}=await sb.functions.invoke('google-calendar-connect',{body:{}});
-    if(error)throw error;
-    if(!data?.url)throw new Error('Google authorization URL was not returned.');
-    window.location.href=data.url;
-  }catch(e){
-    console.error('Google Calendar connection error:',e);
-    alert('Could not start Google Calendar connection. Check the Supabase Edge Function logs.');
-    calendarBtn.disabled=false;
-    calendarBtn.textContent='Connect Calendar';
-  }
-};
-
-const calendarParams=new URLSearchParams(window.location.search);
-const calendarStatus=calendarParams.get('calendar');
-if(calendarStatus==='connected'){
-  setTimeout(()=>alert('Google Calendar connected successfully.'),500);
-  calendarParams.delete('calendar');
-  calendarParams.delete('message');
-  const cleanUrl=window.location.pathname+(calendarParams.toString()?'?'+calendarParams.toString():'');
-  window.history.replaceState({},'',cleanUrl);
-}
-if(calendarStatus==='error'){
-  const msg=calendarParams.get('message')||'Google Calendar could not be connected.';
-  setTimeout(()=>alert(msg),500);
-}
-'''
-          s = s.replace(marker, block + '\n' + marker, 1)
-
-          s = s.replace(
-              "Check the Supabase Edge Function logs and OpenAI API billing/key settings, then try again.",
-              "Check the Supabase Edge Function logs and Gemini API settings, then try again."
-          )
-
+          s = s.replace('</body>', tag + '\n</body>', 1)
           p.write_text(s)
           PY
 
-      - name: Commit Calendar OAuth UI
+      - name: Commit calendar integration
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.html
           git diff --cached --quiet && exit 0
-          git commit -m "Add Google Calendar OAuth connection"
+          git commit -m "Enable functional Google Calendar sync"
           git push
