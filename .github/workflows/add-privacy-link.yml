@@ -1,0 +1,46 @@
+name: Add NOVA privacy policy link
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/add-privacy-link.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add visible privacy policy link to homepage
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('index.html')
+          s = p.read_text()
+
+          footer = '''\n<div id="novaPrivacyFooter" style="max-width:1500px;margin:0 auto;padding:0 18px 22px;text-align:center;font-family:DM Sans,Arial,sans-serif;font-size:11px;color:var(--muted)">\n  <a href="privacy.html" style="color:var(--accent);font-weight:700;text-decoration:none">Privacy Policy</a>\n  <span aria-hidden="true"> · </span>\n  <span>Google Calendar data is used only for user-requested planning and synchronization features.</span>\n</div>\n'''
+
+          import re
+          s = re.sub(r'\n?<div id="novaPrivacyFooter"[\s\S]*?</div>\n?', '\n', s)
+
+          if '</body>' not in s:
+              raise SystemExit('Could not find </body> in index.html')
+
+          s = s.replace('</body>', footer + '</body>', 1)
+          p.write_text(s)
+          PY
+
+      - name: Commit privacy link
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet && exit 0
+          git commit -m "Link NOVA privacy policy from homepage"
+          git push
