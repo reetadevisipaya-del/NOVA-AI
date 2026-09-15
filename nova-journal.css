@@ -1,0 +1,245 @@
+/* NOVA journal refinement — realistic notebook, readable typography, productive palette. */
+:root{
+  --bg:#e7eee8;
+  --surface:#fbf8ef;
+  --surface2:#e2e9e3;
+  --ink:#24312b;
+  --muted:#5e6b64;
+  --line:#c8d1ca;
+  --accent:#3f6755;
+  --accent2:#6f8f7f;
+  --soft:#dce8df;
+  --warm:#b98256;
+  --danger:#944f57;
+  --shadow:0 18px 55px rgba(45,63,54,.14);
+}
+body.dark{
+  --bg:#1e2823;
+  --surface:#27332d;
+  --surface2:#34413b;
+  --ink:#f2efe6;
+  --muted:#c1c8c2;
+  --line:#48554e;
+  --accent:#9fc4ad;
+  --accent2:#7ea18e;
+  --soft:#30443a;
+  --warm:#d0a170;
+  --danger:#e0939a;
+  --shadow:0 18px 55px rgba(0,0,0,.25);
+}
+*{font-family:"Times New Roman",Times,serif}
+body{
+  font-size:16px;
+  line-height:1.5;
+  letter-spacing:.005em;
+  background:
+    radial-gradient(circle at 14% 8%,rgba(255,255,255,.65),transparent 24%),
+    radial-gradient(circle at 86% 3%,rgba(92,130,107,.12),transparent 28%),
+    linear-gradient(180deg,#edf3ee 0%,var(--bg) 55%,#dde7df 100%);
+  color:var(--ink);
+}
+body.dark{background:linear-gradient(180deg,#202c26 0%,var(--bg) 100%)}
+button,input,select,textarea{font-family:"Times New Roman",Times,serif;font-size:15px}
+h1,h2,h3,.brand{font-family:"Times New Roman",Times,serif;font-weight:500;letter-spacing:0}
+h1{font-size:clamp(42px,5vw,66px);line-height:1.04}
+h2{font-size:29px}
+p,.welcome p,.setup-main>p,.modal-card p{font-size:16px;line-height:1.55}
+.brand{font-size:22px}
+.btn{font-size:15px;font-weight:500;padding:11px 17px;border-radius:12px}
+.q label,.field label,.permission b,.value b,.taskrow b,.plan b{font-weight:500}
+.q label,.field label{font-size:15px}
+.choice,.permission{font-size:15px}
+.permission b{font-size:15px}.permission small{font-size:13px}
+.value b{font-size:15px}.value small{font-size:13px}
+.auth-status{font-size:13px;max-width:260px}
+.card{border-radius:24px;box-shadow:var(--shadow)}
+
+/* Landing journal */
+.stage{perspective:1700px;min-height:620px}
+.diary{
+  width:min(540px,90%);
+  height:380px;
+  transform:rotateX(9deg) rotateY(-8deg) rotateZ(-1.5deg);
+  filter:drop-shadow(0 42px 42px rgba(35,48,41,.24));
+}
+.cover{
+  border-radius:25px 34px 34px 25px;
+  background:
+    linear-gradient(120deg,rgba(255,255,255,.09),transparent 22%),
+    repeating-linear-gradient(96deg,rgba(255,255,255,.018) 0 2px,rgba(0,0,0,.018) 2px 4px),
+    linear-gradient(145deg,#315645,#26483a 47%,#6f4f3b 140%);
+  border:1px solid rgba(32,55,45,.7);
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,.05),inset -16px 0 26px rgba(0,0,0,.12),0 34px 72px rgba(26,39,32,.22);
+}
+.cover:before{font-size:36px;font-weight:500;letter-spacing:.18em;text-shadow:0 2px 6px rgba(0,0,0,.18)}
+.cover:after{left:18px;width:20px;background:linear-gradient(90deg,#17231e,#26372f,#17231e);box-shadow:2px 0 8px rgba(0,0,0,.2)}
+.pages{bottom:-28px;height:60px;border-radius:0 0 24px 24px;background:repeating-linear-gradient(to bottom,#fffdf5 0 3px,#d7d0c4 3px 4px);box-shadow:inset 0 -8px 14px rgba(80,68,50,.08)}
+.float{font-size:14px;border-radius:12px;background:rgba(251,248,239,.96);backdrop-filter:blur(8px)}
+.float b{font-weight:500}
+
+/* Dashboard notebook */
+.dashboard{grid-template-columns:minmax(0,1.45fr) minmax(300px,.72fr);gap:20px}
+.dash,.assistant{padding:24px}
+.dashhead{margin-bottom:12px;align-items:center}
+.dashhead h1{font-size:48px}
+.dashhead p{font-size:15px}
+.dashbuttons{gap:9px}
+#addTaskBtn,#addEventBtn{display:none!important}
+.openstage{perspective:1800px;padding:18px 0 26px}
+.openbook{
+  width:min(820px,97%);
+  min-height:620px;
+  transform:rotateX(3.8deg) rotateY(-1.8deg) translateZ(0);
+  transform-style:preserve-3d;
+  filter:drop-shadow(0 35px 35px rgba(51,61,54,.18));
+}
+.openbook:before{
+  content:"";
+  position:absolute;
+  left:-18px;right:-18px;top:-14px;bottom:-19px;
+  border-radius:25px;
+  background:linear-gradient(135deg,#365847,#244336 62%,#7b5a43 150%);
+  transform:translateZ(-16px);
+  box-shadow:0 28px 55px rgba(38,48,42,.2),inset 0 0 0 1px rgba(255,255,255,.06);
+}
+.openbook:after{
+  content:"";
+  position:absolute;
+  right:-10px;top:18px;bottom:-8px;width:21px;
+  border-radius:0 16px 16px 0;
+  background:repeating-linear-gradient(to bottom,#fffdf6 0 3px,#d5cec0 3px 4px);
+  transform:translateZ(-7px);
+}
+.openpages{
+  position:absolute;
+  inset:0;
+  padding:30px 42px 34px 55px;
+  border-radius:17px 20px 20px 17px;
+  border:1px solid #cbc2b2;
+  color:#27312c;
+  overflow:auto;
+  background:
+    linear-gradient(90deg,rgba(190,178,159,.18) 49.6%,rgba(128,113,92,.24) 50%,rgba(255,255,255,.05) 50.4%),
+    repeating-linear-gradient(to bottom,transparent 0 29px,rgba(102,123,111,.13) 29px 30px),
+    linear-gradient(90deg,#fffdf6 0 49.7%,#f1eadf 50%,#fffaf0 50.5% 100%);
+  box-shadow:inset 16px 0 24px rgba(117,97,67,.05),inset -8px 0 20px rgba(117,97,67,.04),0 8px 18px rgba(62,53,41,.1);
+}
+.openpages:before{
+  content:"";
+  position:absolute;
+  left:-10px;top:21px;bottom:21px;width:18px;
+  border-radius:10px;
+  background:repeating-linear-gradient(to bottom,#25322d 0 7px,transparent 7px 20px);
+  box-shadow:2px 0 4px rgba(0,0,0,.12);
+}
+.ptabs{right:-12px}.ptabs i{box-shadow:0 4px 8px rgba(0,0,0,.12)}
+.date{font-size:28px;font-weight:500;margin-bottom:5px}
+.plan-note{font-size:14px;color:#657069;margin-bottom:14px}
+.plan{grid-template-columns:10px 1fr auto;gap:12px;min-height:70px;border-bottom:1px solid rgba(129,116,96,.23)}
+.plan b{font-size:16px;color:#26312c}
+.plan small{font-size:13px;color:#657069;margin-top:3px}
+.plan time{font-size:14px;color:#52605a}
+.plan-actions{gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.mini{font-size:12px;padding:5px 9px;background:rgba(255,253,248,.82);border-color:#d4ccbf}
+.whybox{font-size:13px;line-height:1.45;background:rgba(240,235,224,.85);color:#5f655e;margin-left:20px}
+.empty-plan{font-size:15px;line-height:1.55;color:#647069;padding:22px 4px}
+.focus{margin-top:18px;border-radius:15px;padding:16px 18px;background:#2d4439;color:#fffdf7}
+.focus small{font-size:13px}.focus b{font-size:16px;font-weight:500}.focus #focusTimer{font-size:13px}
+.stats{gap:10px}.stat{padding:14px}.stat b{font-size:21px;font-weight:500}.stat small{font-size:13px}
+
+/* In-notebook entry controls */
+.journal-entry-toolbar{
+  position:relative;
+  z-index:4;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:11px 13px;
+  margin:-4px 0 18px;
+  border:1px solid rgba(74,95,83,.22);
+  border-radius:12px;
+  background:rgba(246,246,238,.88);
+  box-shadow:0 7px 18px rgba(58,67,60,.08);
+  backdrop-filter:blur(6px);
+}
+.journal-entry-toolbar .journal-copy{font-size:14px;color:#59675f}
+.journal-entry-toolbar .journal-copy strong{display:block;font-size:16px;font-weight:500;color:#26362e;margin-bottom:1px}
+.journal-entry-toolbar button{white-space:nowrap}
+.journal-footer{
+  margin-top:20px;
+  padding-top:16px;
+  border-top:1px solid rgba(108,119,111,.22);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  flex-wrap:wrap;
+}
+.journal-footer-copy{font-size:14px;color:#617068}
+.journal-footer-copy strong{display:block;color:#2d3d34;font-size:16px;font-weight:500}
+.journal-add-again{display:none}
+.journal-add-again.show{display:inline-flex}
+#generateBtn{font-size:15px!important;padding:12px 18px!important}
+
+/* Unified task/event composer */
+#journalEntryModal{z-index:80}
+#journalEntryModal .modal-card{width:min(620px,100%);padding:26px;border-radius:20px}
+.entry-type-tabs{display:flex;gap:22px;margin:16px 0 6px;border-bottom:1px solid var(--line)}
+.entry-tab{
+  appearance:none;border:0;background:transparent;color:var(--muted);padding:8px 2px 9px;font-size:17px;font-weight:400;position:relative
+}
+.entry-tab:after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:transparent}
+.entry-tab.active{color:var(--ink);font-weight:500}
+.entry-tab.active:after{background:var(--accent)}
+.entry-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.entry-grid .wide{grid-column:1/-1}
+.entry-section{margin-top:12px}
+.entry-section[hidden]{display:none!important}
+.entry-colors{display:flex;gap:9px;flex-wrap:wrap;margin-top:7px}
+.entry-color{
+  width:30px;height:30px;border-radius:50%;border:2px solid rgba(255,255,255,.85);box-shadow:0 0 0 1px rgba(42,54,47,.2);padding:0
+}
+.entry-color.active{box-shadow:0 0 0 3px var(--ink)}
+.entry-help{font-size:13px;color:var(--muted);margin-top:4px}
+.entry-success{display:none;padding:16px;margin-top:16px;border-radius:14px;background:var(--soft);color:var(--ink)}
+.entry-success.show{display:block}
+.entry-success strong{display:block;font-size:17px;font-weight:500;margin-bottom:7px}
+.entry-success-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+
+/* Task edit color palette */
+#legacyTaskColorField .entry-colors{margin-top:8px}
+.task-color-chip{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:7px;vertical-align:-1px;border:1px solid rgba(0,0,0,.08)}
+
+/* Readability */
+.modal-card{font-size:15px}
+.field input,.field select{height:46px;font-size:15px;padding:0 13px}
+.checkrow{font-size:14px}
+.notice{font-size:14px;line-height:1.45}
+.taskrow{padding:14px 0}.taskrow b{font-size:15px}.taskrow small{font-size:13px;line-height:1.4}
+.assistant{min-height:730px}
+.assistant-head p{font-size:14px}.messages{max-height:520px}.msg{font-size:15px;line-height:1.5;padding:11px 13px}.quick button{font-size:13px;padding:7px 10px}.chat input{font-size:15px;height:46px}.chat button{height:46px;width:46px}
+.insight small{font-size:12px}.insight b{font-size:15px;font-weight:500}
+.toolbar-note{font-size:13px}
+
+@media(max-width:950px){
+  .dashboard{grid-template-columns:1fr}
+  .openbook{min-height:650px}
+  .assistant{min-height:560px}
+}
+@media(max-width:640px){
+  body{font-size:15px}
+  .dash,.assistant{padding:15px}
+  .dashhead{align-items:flex-start;flex-direction:column}
+  .dashhead h1{font-size:38px}
+  .openstage{padding-top:8px}
+  .openbook{width:100%;min-height:690px;transform:none;filter:none}
+  .openbook:before{left:-4px;right:-4px;top:-8px;bottom:-10px}
+  .openpages{padding:25px 20px 30px 30px}
+  .journal-entry-toolbar{align-items:flex-start;flex-direction:column}
+  .journal-entry-toolbar button{width:100%}
+  .entry-grid{grid-template-columns:1fr}
+  .entry-grid .wide{grid-column:auto}
+  .journal-footer{align-items:stretch;flex-direction:column}
+  #generateBtn,.journal-add-again{width:100%}
+}
