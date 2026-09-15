@@ -22,6 +22,7 @@ body.dark{--bg:#171a1f;--surface:#20242a;--surface2:#2b3037;--ink:#f4f1ea;--mute
 <body>
 <div class="app">
 <div class="topbar"><div class="brand"><span class="mark"></span>NOVA</div><div class="actions"><span id="authStatus" class="auth-status">Not signed in</span><button id="calendarBtn" class="btn secondary" style="display:none">Connect Calendar</button><button id="manageBtn" class="btn secondary" style="display:none">Tasks</button><button id="addEventBtn" class="btn secondary" style="display:none">+ Event</button><button id="addTaskBtn" class="btn secondary" style="display:none">+ Task</button><button id="authBtn" class="btn secondary">Sign in</button><button id="theme" class="btn secondary icon">◐</button></div></div>
+<div id="calendarNotice" class="notice" role="status" aria-live="polite" style="margin:0 0 12px"></div>
 <section id="s1" class="screen active"><div class="welcome card"><div><span class="kicker">AI-assisted daily planning</span><h1>Plan with clarity.<br>Move with confidence.</h1><p>A calm workspace that helps you understand what matters next, protect focus, and adapt when your day changes.</p><div class="hero-actions"><button class="btn primary" id="start">Build my planner →</button><button class="btn secondary" id="preview">Preview Today</button></div><div class="values"><div class="value"><div class="vicon">01</div><div><b>Understand you</b><small>Lightweight setup</small></div></div><div class="value"><div class="vicon">02</div><div><b>Build the day</b><small>Realistic focus blocks</small></div></div><div class="value"><div class="vicon">03</div><div><b>Adapt calmly</b><small>User stays in control</small></div></div></div></div><div class="stage" id="stage"><div class="float f1"><b>9:00 · Focus</b>Design critique prep</div><div class="diary" id="diary"><div class="cover"></div><div class="pages"></div><div class="tabs"><i></i><i></i><i></i><i></i></div></div><div class="float f2"><b>2:30 · Meeting</b>Research review</div></div></div></section>
 <section id="s2" class="screen"><div class="setup"><div class="card setup-main"><div class="steps"><i class="active"></i><i class="active"></i><i></i><i></i></div><h1>Shape your planner.</h1><p>These choices tell NOVA how much work is realistic and how flexible your day usually is.</p><div class="q"><label>Which best describes your routine?</label><div class="choices" data-group="role"><button class="choice">Student</button><button class="choice">Working professional</button><button class="choice">Freelancer / creator</button><button class="choice">Mixed / other</button></div></div><div class="q"><label>What should NOVA help improve most?</label><div class="choices" data-group="goal"><button class="choice">Finish important work</button><button class="choice">Reduce overwhelm</button><button class="choice">Protect focus time</button><button class="choice">Balance work and health</button></div></div><div class="q"><label>How predictable is your day?</label><div class="choices" data-group="predict"><button class="choice">Very predictable</button><button class="choice">Some changes</button><button class="choice">Changes often</button><button class="choice">Completely flexible</button></div></div><div class="q"><label>Realistic focused work per normal day? <span id="hoursLabel">3h</span></label><input id="hours" type="range" min="1" max="6" value="3" style="width:100%"></div><div class="q"><label>Optional connections</label><div class="permissions"><button class="permission" data-app="Calendar"><span><b>Calendar</b><small>See fixed commitments</small></span><span class="toggle"></span></button><button class="permission" data-app="Task app"><span><b>Task app</b><small>Bring existing work into NOVA</small></span><span class="toggle"></span></button><button class="permission" data-app="Sleep / health"><span><b>Sleep / health</b><small>Optional context only; never required</small></span><span class="toggle"></span></button></div></div><div class="setup-actions"><button id="back" class="btn secondary">← Back</button><button id="finish" class="btn primary">Save & open Today →</button></div></div><aside class="card setup-side"><h2>What NOVA is learning</h2><p class="muted" style="font-size:11px;line-height:1.6;margin-top:7px">You can change these preferences later.</p><div id="summary"></div><div class="insight"><small>Planning principle</small><b>AI recommends. You decide.</b></div></aside></div></section>
 <section id="s3" class="screen"><div class="dashboard"><div class="card dash"><div class="dashhead"><div><span class="kicker">TODAY · <span id="todayDate"></span></span><h1>Your day, in view.</h1><p id="greeting">Good morning.</p></div><div class="dashbuttons"><button id="generateBtn" class="btn primary">Generate Today plan</button><button id="editSetup" class="btn secondary">Edit setup</button></div></div><div class="openstage"><div class="openbook"><div class="openpages"><div class="date">Today</div><div id="planNote" class="plan-note">Your planner will use priorities, deadlines, duration, meetings and focus capacity.</div><div id="planList"></div><div class="focus"><div><small>FOCUS MODE</small><b id="focusLabel">No task selected · 25 min</b><small id="focusTimer" style="display:block;margin-top:4px">Ready</small></div><button id="focusBtn" class="btn" style="background:#fff;color:#222">Start</button></div><div class="stats"><div class="stat"><b id="taskCount">0</b><small>open tasks</small></div><div class="stat"><b id="meetingCount">0</b><small>fixed events</small></div><div class="stat"><b id="statHours">3h</b><small>focus capacity</small></div></div></div><div class="ptabs"><i></i><i></i><i></i><i></i></div></div></div></div><aside class="card assistant"><div class="assistant-head"><h2>NOVA Assistant</h2><p>Uses your planner context · <b>Live AI planning assistant</b></p></div><div id="messages" class="messages"><div class="msg bot">Add tasks and calendar events, then generate your Today plan. I can explain why a task was placed first.</div></div><div class="quick"><button data-q="What should I do next?">What next?</button><button data-q="Why is this first?">Why this first?</button><button data-q="How busy is my day?">How busy?</button><button data-q="Can I move something?">Can I move something?</button></div><div class="chat"><input id="chatInput" placeholder="Ask NOVA…"><button id="send">↑</button></div></aside></div></section>
@@ -59,8 +60,89 @@ async function saveChat(role,content){if(!currentUser)return;try{let cid=await g
 function addMsg(t,w){let d=document.createElement('div');d.className='msg '+w;d.innerHTML=t;messages.appendChild(d);messages.scrollTop=messages.scrollHeight;return d}
 async function sendQ(q){q=(q||'').trim();if(!q)return;if(!currentUser){addMsg('Please sign in so I can use your private NOVA planner context.','bot');openAuth('login');return}addMsg(esc(q),'user');await saveChat('user',q);const thinking=addMsg('Thinking with your current plan…','bot');try{const {data,error}=await sb.functions.invoke('nova-assistant',{body:{message:q}});thinking.remove();if(error)throw error;if(data?.error)throw new Error(data.error);const answer=(data?.answer||'I could not generate a response right now.').trim();addMsg(esc(answer).replace(/\n/g,'<br>'),'bot');await saveChat('assistant',answer)}catch(e){thinking.remove();console.error('NOVA AI error',e);addMsg('I could not reach the live AI assistant. Check the Supabase Edge Function logs and Gemini API settings, then try again.','bot')}}
 $('send').onclick=()=>{let q=chatInput.value;chatInput.value='';sendQ(q)};chatInput.onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();let q=e.target.value;e.target.value='';sendQ(q)}};document.querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>sendQ(b.dataset.q));
-calendarBtn.onclick=async()=>{if(!currentUser){openAuth('login');return}calendarBtn.disabled=true;calendarBtn.textContent='Connecting…';try{const {data,error}=await sb.functions.invoke('google-calendar-connect',{body:{}});if(error)throw error;if(!data?.url)throw new Error('Google authorization URL was not returned.');window.location.href=data.url}catch(e){console.error('Google Calendar connection error:',e);alert('Could not start Google Calendar connection. Check the google-calendar-connect Edge Function logs.');calendarBtn.disabled=false;calendarBtn.textContent='Connect Calendar'}};
-const calendarParams=new URLSearchParams(window.location.search),calendarStatus=calendarParams.get('calendar');if(calendarStatus==='connected'){setTimeout(()=>alert('Google Calendar connected successfully.'),500);calendarParams.delete('calendar');calendarParams.delete('message');const cleanUrl=window.location.pathname+(calendarParams.toString()?'?'+calendarParams.toString():'');window.history.replaceState({},'',cleanUrl)}if(calendarStatus==='error'){const message=calendarParams.get('message')||'Google Calendar could not be connected.';setTimeout(()=>alert(message),500)}
-[authModal,taskModal,eventModal,manageModal].forEach(m=>m.onclick=e=>{if(e.target===m)m.classList.remove('open')});async function onSession(s){currentUser=s?.user||null;setAuthUI();if(currentUser){await loadProfile();await loadDashboard()}else{show(1);renderDemo()}}sb.auth.getSession().then(({data})=>onSession(data.session));sb.auth.onAuthStateChange((_e,s)=>setTimeout(()=>onSession(s),0));refreshSummary();renderDemo();
+// Calendar status is verified server-side, never inferred from a redirect alone.
+let calendarConnected=false,calendarBusy=false,calendarStatusVersion=0;
+function renderCalendarButton(){
+  calendarBtn.disabled=calendarBusy;
+  calendarBtn.textContent=calendarBusy?'Connecting…':calendarConnected?'Calendar connected ✓':'Connect Calendar';
+  calendarBtn.title=calendarConnected?'Google Calendar is connected. Click to reconnect.':'Connect your Google Calendar';
+}
+function calendarNotice(message,isError=false){
+  notice($('calendarNotice'),message,isError);
+}
+async function calendarRequest(action){
+  const controller=new AbortController();
+  let timer;
+  try{
+    return await Promise.race([
+      (async()=>{
+        const {data:sessionData,error:sessionError}=await sb.auth.getSession();
+        if(sessionError||!sessionData.session)throw new Error('Please sign in again, then connect your calendar.');
+        if(controller.signal.aborted)throw new Error('Connection timed out.');
+        const response=await fetch(SUPABASE_URL+'/functions/v1/google-calendar-connect',{
+          method:'POST',
+          headers:{'Content-Type':'application/json',apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+sessionData.session.access_token},
+          body:JSON.stringify({action}),signal:controller.signal
+        });
+        const data=await response.json().catch(()=>null);
+        if(response.status===401)throw new Error('Your session has expired. Please sign in again.');
+        if(!response.ok||data?.error)throw new Error(data?.error||'Google Calendar is unavailable. Please try again.');
+        if(!data)throw new Error('Google Calendar returned an incomplete response. Please try again.');
+        return data;
+      })(),
+      new Promise((_,reject)=>{timer=setTimeout(()=>{
+        reject(new Error('The connection timed out. Check your internet connection and try again.'));
+        controller.abort();
+      },15000)})
+    ]);
+  }finally{clearTimeout(timer)}
+}
+async function refreshCalendarStatus(){
+  if(!currentUser)return;
+  const userId=currentUser.id,version=++calendarStatusVersion;
+  try{
+    const data=await calendarRequest('status');
+    if(version!==calendarStatusVersion||currentUser?.id!==userId)return;
+    calendarConnected=data.connected===true;
+    renderCalendarButton();
+    if(calendarReturnStatus==='connected'){
+      calendarNotice(calendarConnected?'Google Calendar connected successfully.':'The connection could not be confirmed. Please try connecting again.',!calendarConnected);
+      calendarReturnStatus=null;
+    }
+  }catch(e){
+    if(version!==calendarStatusVersion||currentUser?.id!==userId)return;
+    calendarNotice('Could not check calendar status. '+e.message,true);
+  }
+}
+calendarBtn.onclick=async()=>{
+  if(!currentUser){openAuth('login');return}
+  if(calendarBusy)return;
+  if(calendarConnected&&!confirm('Google Calendar is already connected. Reconnect it?'))return;
+  const userId=currentUser.id;
+  ++calendarStatusVersion;
+  calendarBusy=true;renderCalendarButton();clearNotice($('calendarNotice'));
+  try{
+    const data=await calendarRequest('connect');
+    if(currentUser?.id!==userId)return;
+    const url=new URL(data.url);
+    if(url.origin!=='https://accounts.google.com'||url.pathname!=='/o/oauth2/v2/auth')throw new Error('Google authorization URL was not returned correctly.');
+    window.location.assign(url.href);
+  }catch(e){
+    if(currentUser?.id===userId)calendarNotice(e.message||'Could not start Google Calendar connection. Please try again.',true);
+  }finally{
+    calendarBusy=false;renderCalendarButton();
+  }
+};
+const calendarParams=new URLSearchParams(window.location.search);
+let calendarReturnStatus=calendarParams.get('calendar');
+if(calendarReturnStatus==='connected'||calendarReturnStatus==='error'){
+  calendarNotice(calendarReturnStatus==='connected'?'Checking Google Calendar connection…':calendarParams.get('message')||'Google Calendar permission was not granted. Please try again.',calendarReturnStatus==='error');
+  calendarParams.delete('calendar');calendarParams.delete('message');
+  window.history.replaceState({},'',window.location.pathname+(calendarParams.toString()?'?'+calendarParams.toString():'')+window.location.hash);
+}
+window.addEventListener('pageshow',event=>{
+  if(event.persisted){calendarBusy=false;renderCalendarButton();refreshCalendarStatus()}
+});
+[authModal,taskModal,eventModal,manageModal].forEach(m=>m.onclick=e=>{if(e.target===m)m.classList.remove('open')});async function onSession(s){const previousUserId=currentUser?.id;currentUser=s?.user||null;if(previousUserId!==currentUser?.id){++calendarStatusVersion;calendarConnected=false;calendarBusy=false;if(!currentUser)clearNotice($('calendarNotice'))}setAuthUI();renderCalendarButton();if(currentUser){void refreshCalendarStatus();await loadProfile();await loadDashboard()}else{show(1);renderDemo()}}sb.auth.getSession().then(({data})=>onSession(data.session));sb.auth.onAuthStateChange((_e,s)=>setTimeout(()=>onSession(s),0));refreshSummary();renderDemo();
 </script>
 </body></html>
