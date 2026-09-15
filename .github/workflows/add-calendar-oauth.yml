@@ -1,4 +1,4 @@
-name: Wire Google Calendar sync UI
+name: Deploy NOVA built-in calendar UI
 
 on:
   push:
@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Load enhanced calendar integration
+      - name: Load built-in calendar integration
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -25,26 +25,29 @@ jobs:
           p = Path('index.html')
           s = p.read_text()
           tags = (
-              '<script src="calendar-sync.js?v=20260915-1934"></script>\n'
-              '<script src="calendar-universal.js?v=20260915-1934"></script>'
+              '<script src="calendar-sync.js?v=20260915-2140"></script>\n'
+              '<script src="calendar-universal.js?v=20260915-2140"></script>'
           )
 
-          # Remove older injected calendar scripts if this workflow is rerun.
           s = re.sub(r'\n?<script src="calendar-sync\.js(?:\?v=[^"]*)?"></script>', '', s)
           s = re.sub(r'\n?<script src="calendar-universal\.js(?:\?v=[^"]*)?"></script>', '', s)
 
           if '</body>' not in s:
               raise SystemExit('Could not find </body> in index.html')
 
+          s = s.replace(
+              'Google Calendar data is used only for user-requested planning and synchronization features.',
+              'Calendar data is used only for user-requested planning features.'
+          )
           s = s.replace('</body>', tags + '\n</body>', 1)
           p.write_text(s)
           PY
 
-      - name: Commit calendar integration
+      - name: Commit built-in calendar integration
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.html
           git diff --cached --quiet && exit 0
-          git commit -m "Expose Google Calendar to all NOVA users"
+          git commit -m "Switch NOVA to built-in calendar workflow"
           git push
