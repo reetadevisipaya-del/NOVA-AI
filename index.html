@@ -145,12 +145,12 @@ window.addEventListener('pageshow',event=>{
 });
 [authModal,taskModal,eventModal,manageModal].forEach(m=>m.onclick=e=>{if(e.target===m)m.classList.remove('open')});async function onSession(s){const previousUserId=currentUser?.id;currentUser=s?.user||null;if(previousUserId!==currentUser?.id){++calendarStatusVersion;calendarConnected=false;calendarBusy=false;if(!currentUser)clearNotice($('calendarNotice'))}setAuthUI();renderCalendarButton();if(currentUser){void refreshCalendarStatus();await loadProfile();await loadDashboard()}else{show(1);renderDemo()}}sb.auth.getSession().then(({data})=>onSession(data.session));sb.auth.onAuthStateChange((_e,s)=>setTimeout(()=>onSession(s),0));refreshSummary();renderDemo();
 </script>
-<script src="calendar-sync.js?v=20260915-1934"></script>
-<script src="calendar-universal.js?v=20260915-1934"></script>
 
 <div id="novaPrivacyFooter" style="max-width:1500px;margin:0 auto;padding:0 18px 22px;text-align:center;font-family:DM Sans,Arial,sans-serif;font-size:11px;color:var(--muted)">
   <a href="privacy.html" style="color:var(--accent);font-weight:700;text-decoration:none">Privacy Policy</a>
   <span aria-hidden="true"> · </span>
-  <span>Google Calendar data is used only for user-requested planning and synchronization features.</span>
+  <span>Calendar data is used only for user-requested planning features.</span>
 </div>
+<script src="calendar-sync.js?v=20260915-2140"></script>
+<script src="calendar-universal.js?v=20260915-2140"></script>
 </body></html>
