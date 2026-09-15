@@ -1,4 +1,4 @@
-name: Deploy NOVA built-in calendar UI
+name: Deploy NOVA journal UI
 
 on:
   push:
@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Load built-in calendar integration
+      - name: Load NOVA journal and calendar integration
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -24,19 +24,24 @@ jobs:
 
           p = Path('index.html')
           s = p.read_text()
+
+          style = '<link rel="stylesheet" href="nova-journal.css?v=20260915-2305">'
           tags = (
-              '<script src="calendar-sync.js?v=20260915-2245"></script>\n'
-              '<script src="calendar-universal.js?v=20260915-2245"></script>\n'
-              '<script src="calendar-outlook.js?v=20260915-2245"></script>'
+              '<script src="calendar-sync.js?v=20260915-2305"></script>\n'
+              '<script src="calendar-universal.js?v=20260915-2305"></script>\n'
+              '<script src="nova-journal.js?v=20260915-2305"></script>'
           )
 
+          s = re.sub(r'\n?<link rel="stylesheet" href="nova-journal\.css(?:\?v=[^"]*)?">', '', s)
           s = re.sub(r'\n?<script src="calendar-sync\.js(?:\?v=[^"]*)?"></script>', '', s)
           s = re.sub(r'\n?<script src="calendar-universal\.js(?:\?v=[^"]*)?"></script>', '', s)
           s = re.sub(r'\n?<script src="calendar-outlook\.js(?:\?v=[^"]*)?"></script>', '', s)
+          s = re.sub(r'\n?<script src="nova-journal\.js(?:\?v=[^"]*)?"></script>', '', s)
 
-          if '</body>' not in s:
-              raise SystemExit('Could not find </body> in index.html')
+          if '</head>' not in s or '</body>' not in s:
+              raise SystemExit('Could not find document closing tags in index.html')
 
+          s = s.replace('</head>', style + '\n</head>', 1)
           s = s.replace(
               'Google Calendar data is used only for user-requested planning and synchronization features.',
               'Calendar data is used only for user-requested planning features.'
@@ -45,11 +50,11 @@ jobs:
           p.write_text(s)
           PY
 
-      - name: Commit built-in calendar integration
+      - name: Commit NOVA journal integration
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.html
           git diff --cached --quiet && exit 0
-          git commit -m "Load simplified Outlook Calendar shortcut in NOVA"
+          git commit -m "Load refined NOVA journal experience"
           git push
