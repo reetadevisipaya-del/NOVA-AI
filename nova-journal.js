@@ -3,12 +3,12 @@
   'use strict';
 
   const palette = [
-    { value: '#6F927A', label: 'Sage' },
-    { value: '#6E8FAF', label: 'Blue' },
-    { value: '#C29355', label: 'Amber' },
-    { value: '#B87983', label: 'Rose' },
-    { value: '#8B80A4', label: 'Lavender' },
-    { value: '#647A73', label: 'Slate' }
+    { value: '#B9A7E8', label: 'Lavender' },
+    { value: '#AFC9EE', label: 'Powder blue' },
+    { value: '#E9B7CC', label: 'Blush' },
+    { value: '#F4C5A8', label: 'Peach' },
+    { value: '#EFD88C', label: 'Butter' },
+    { value: '#B9DFC9', label: 'Mint' }
   ];
 
   let entryType = 'task';
@@ -311,7 +311,7 @@
       if (!title) return;
       const task = (currentTasks || []).find(item => item.title === title);
       const event = (currentEvents || []).find(item => item.title === title);
-      const color = task?.color || event?.color || (task ? palette[0].value : '#6E8FAF');
+      const color = task?.color || event?.color || (task ? palette[0].value : '#AFC9EE');
       const bar = row.querySelector('.bar');
       if (bar) bar.style.background = color;
     });
@@ -329,7 +329,6 @@
     });
   }
 
-  /* Load task/event colour data without disturbing the existing dashboard logic. */
   const previousLoadDashboard = loadDashboard;
   loadDashboard = async function(render = true) {
     await previousLoadDashboard(false);
@@ -345,7 +344,7 @@
         const taskMap = new Map((taskColors.data || []).map(item => [item.id, item.color]));
         const eventMap = new Map((eventColors.data || []).map(item => [item.id, item.color]));
         currentTasks = (currentTasks || []).map(item => ({ ...item, color: taskMap.get(item.id) || item.color || palette[0].value }));
-        currentEvents = (currentEvents || []).map(item => ({ ...item, color: eventMap.get(item.id) || item.color || '#6E8FAF' }));
+        currentEvents = (currentEvents || []).map(item => ({ ...item, color: eventMap.get(item.id) || item.color || '#AFC9EE' }));
       } catch (_) {}
     }
     if (render) renderPlan();
@@ -365,7 +364,6 @@
     decorateManageColors();
   };
 
-  /* Add colour selection when editing an existing task. */
   function ensureLegacyTaskColorField() {
     if (byId('legacyTaskColorField')) return;
     const noticeEl = byId('taskNotice');
@@ -398,7 +396,6 @@
     };
   }
 
-  /* Replace the two separate dashboard entry actions with the notebook composer. */
   addTaskBtn.onclick = () => openEntryComposer('task');
   addEventBtn.onclick = () => openEntryComposer('event');
   const calendarNewEvent = byId('newCalendarEventBtn');
@@ -409,7 +406,6 @@
     };
   }
 
-  /* Branded confirmation state. Supabase remains the account confirmation authority. */
   const authSubmit = byId('submitAuth');
   const previousAuthSubmit = authSubmit?.onclick;
   if (authSubmit && previousAuthSubmit) {
@@ -419,7 +415,7 @@
       await previousAuthSubmit();
       const authNotice = byId('authNotice');
       if (modeBefore === 'signup' && authNotice?.classList.contains('show') && !authNotice.classList.contains('err') && /check your email/i.test(authNotice.textContent || '')) {
-        authNotice.innerHTML = `<strong style="font-weight:500">NOVA AI sent your confirmation email.</strong><br>Open the message sent to <span>${safe(emailBefore)}</span>, confirm your email, then return here to sign in.<br><button id="resendNovaConfirmation" class="btn secondary" type="button" style="margin-top:10px">Resend confirmation</button>`;
+        authNotice.innerHTML = `<strong style="font-weight:600">NOVA AI sent your confirmation email.</strong><br>Open the message sent to <span>${safe(emailBefore)}</span>, confirm your email, then return here to sign in.<br><button id="resendNovaConfirmation" class="btn secondary" type="button" style="margin-top:10px">Resend confirmation</button>`;
         byId('resendNovaConfirmation').onclick = async () => {
           const button = byId('resendNovaConfirmation');
           button.disabled = true;
@@ -453,4 +449,239 @@
       if (!session?.user) closeEntryComposer();
     }, 0);
   });
+})();
+
+/* NOVA inspiration shelf: personalized daily quotes + lightweight original art. */
+(() => {
+  'use strict';
+
+  const QUOTES = {
+    focus: [
+      'Choose one clear thing, then give it your full attention.',
+      'A small finished task creates more momentum than a perfect plan.',
+      'Protect the next thirty minutes and the rest of the day gets easier.',
+      'Clarity grows when the next action is visible.',
+      'Make the important thing easy to begin.',
+      'Your attention is a workspace. Keep only what matters on the desk.'
+    ],
+    calm: [
+      'A calm plan can still be an ambitious plan.',
+      'Leave a little white space in the day for being human.',
+      'You do not need to rush to make meaningful progress.',
+      'Gentle structure is still structure.',
+      'A quieter pace can reveal the clearest next step.',
+      'Rest and focus belong in the same well-designed day.'
+    ],
+    creativity: [
+      'Curiosity turns an ordinary task into a doorway.',
+      'Make room for the idea that was not on the schedule.',
+      'Beautiful work often begins as a playful draft.',
+      'Collect small sparks. They become larger ideas later.',
+      'A fresh angle is sometimes more useful than more effort.',
+      'Your planner can hold both discipline and imagination.'
+    ],
+    courage: [
+      'Begin before the confidence arrives.',
+      'A difficult task becomes smaller the moment you start it.',
+      'Progress does not have to look dramatic to be real.',
+      'Do the next brave, practical thing.',
+      'You can revise a first attempt; you cannot revise a blank page.',
+      'Consistency is courage repeated quietly.'
+    ]
+  };
+
+  let shuffleOffset = 0;
+  const $q = id => document.getElementById(id);
+
+  function userKey() {
+    const id = typeof currentUser !== 'undefined' && currentUser?.id ? currentUser.id : 'guest';
+    return `novaQuotePrefs:${id}`;
+  }
+
+  function loadPrefs() {
+    const fallback = { category: 'focus', includeOwn: true, own: [] };
+    try {
+      const parsed = JSON.parse(localStorage.getItem(userKey()) || 'null');
+      return { ...fallback, ...(parsed || {}), own: Array.isArray(parsed?.own) ? parsed.own : [] };
+    } catch (_) { return fallback; }
+  }
+
+  function savePrefs(prefs) {
+    localStorage.setItem(userKey(), JSON.stringify(prefs));
+  }
+
+  function dayHash(text) {
+    let hash = 0;
+    for (let i = 0; i < text.length; i++) hash = ((hash << 5) - hash + text.charCodeAt(i)) | 0;
+    return Math.abs(hash);
+  }
+
+  function quotePool(prefs) {
+    const base = QUOTES[prefs.category] || QUOTES.focus;
+    return prefs.includeOwn && prefs.own.length ? base.concat(prefs.own) : base;
+  }
+
+  function quoteForToday(prefs) {
+    const pool = quotePool(prefs);
+    const day = new Date().toISOString().slice(0, 10);
+    const idx = (dayHash(`${day}:${prefs.category}:${userKey()}`) + shuffleOffset) % pool.length;
+    return pool[idx];
+  }
+
+  function ensureBookshelf() {
+    const dash = document.querySelector('.dash');
+    if (!dash || dash.querySelector('.nova-bookshelf')) return;
+    const shelf = document.createElement('div');
+    shelf.className = 'nova-bookshelf';
+    shelf.setAttribute('aria-hidden', 'true');
+    shelf.innerHTML = '<i></i><i></i><i></i><i></i>';
+    dash.appendChild(shelf);
+  }
+
+  function ensureQuoteModal() {
+    if ($q('novaQuoteModal')) return;
+    const modal = document.createElement('div');
+    modal.id = 'novaQuoteModal';
+    modal.className = 'modal';
+    modal.setAttribute('aria-hidden', 'true');
+    modal.innerHTML = `
+      <div class="modal-card">
+        <div class="inline">
+          <div><h2>Your inspiration shelf</h2><p>Choose the kind of reminder you want NOVA to rotate each day, or add your own.</p></div>
+          <button id="novaQuoteClose" class="btn secondary" type="button">Close</button>
+        </div>
+        <div class="field">
+          <label for="novaQuoteCategory">Daily quote theme</label>
+          <select id="novaQuoteCategory">
+            <option value="focus">Focus</option>
+            <option value="calm">Calm</option>
+            <option value="creativity">Creativity</option>
+            <option value="courage">Courage</option>
+          </select>
+        </div>
+        <label class="nova-quote-toggle"><input id="novaIncludeOwn" type="checkbox"> Mix my quotes into the daily rotation</label>
+        <div class="field">
+          <label for="novaQuoteText">Add your own quote</label>
+          <textarea id="novaQuoteText" class="nova-quote-textarea" maxlength="240" placeholder="Write a line you want NOVA to bring back to you on future days…"></textarea>
+        </div>
+        <div class="modal-actions"><button id="novaAddQuote" class="btn primary" type="button">Add quote</button></div>
+        <div id="novaOwnQuoteList" class="nova-quote-list"></div>
+      </div>`;
+    document.body.appendChild(modal);
+    $q('novaQuoteClose').onclick = closeQuoteModal;
+    modal.onclick = e => { if (e.target === modal) closeQuoteModal(); };
+    $q('novaQuoteCategory').onchange = () => {
+      const prefs = loadPrefs(); prefs.category = $q('novaQuoteCategory').value; savePrefs(prefs); shuffleOffset = 0; renderQuote();
+    };
+    $q('novaIncludeOwn').onchange = () => {
+      const prefs = loadPrefs(); prefs.includeOwn = $q('novaIncludeOwn').checked; savePrefs(prefs); shuffleOffset = 0; renderQuote();
+    };
+    $q('novaAddQuote').onclick = () => {
+      const textarea = $q('novaQuoteText');
+      const value = textarea.value.trim();
+      if (!value) return;
+      const prefs = loadPrefs();
+      if (!prefs.own.includes(value)) prefs.own.unshift(value);
+      prefs.own = prefs.own.slice(0, 40);
+      savePrefs(prefs); textarea.value = ''; renderOwnQuotes(); renderQuote();
+    };
+  }
+
+  function renderOwnQuotes() {
+    const list = $q('novaOwnQuoteList');
+    if (!list) return;
+    const prefs = loadPrefs();
+    list.innerHTML = '';
+    if (!prefs.own.length) {
+      const empty = document.createElement('div');
+      empty.className = 'muted'; empty.style.fontSize = '13px'; empty.textContent = 'No personal quotes yet.'; list.appendChild(empty); return;
+    }
+    prefs.own.forEach((text, index) => {
+      const row = document.createElement('div'); row.className = 'nova-own-quote';
+      const span = document.createElement('span'); span.textContent = text;
+      const button = document.createElement('button'); button.type = 'button'; button.textContent = 'Remove';
+      button.onclick = () => { const latest = loadPrefs(); latest.own.splice(index, 1); savePrefs(latest); renderOwnQuotes(); renderQuote(); };
+      row.append(span, button); list.appendChild(row);
+    });
+  }
+
+  function openQuoteModal() {
+    ensureQuoteModal();
+    const prefs = loadPrefs();
+    $q('novaQuoteCategory').value = prefs.category;
+    $q('novaIncludeOwn').checked = prefs.includeOwn;
+    renderOwnQuotes();
+    $q('novaQuoteModal').classList.add('open');
+    $q('novaQuoteModal').setAttribute('aria-hidden', 'false');
+  }
+
+  function closeQuoteModal() {
+    $q('novaQuoteModal')?.classList.remove('open');
+    $q('novaQuoteModal')?.setAttribute('aria-hidden', 'true');
+  }
+
+  function renderQuote() {
+    const quote = $q('novaDailyQuote');
+    const category = $q('novaQuoteQuickCategory');
+    if (!quote || !category) return;
+    const prefs = loadPrefs();
+    quote.textContent = `“${quoteForToday(prefs)}”`;
+    category.value = prefs.category;
+  }
+
+  function mountInspiration() {
+    const dash = document.querySelector('.dash');
+    const openstage = dash?.querySelector('.openstage');
+    if (!dash || !openstage) return;
+    ensureBookshelf();
+    ensureQuoteModal();
+    if (!$q('novaInspirationRow')) {
+      const row = document.createElement('div');
+      row.id = 'novaInspirationRow';
+      row.className = 'nova-inspiration-row';
+      row.innerHTML = `
+        <section class="nova-quote-card" aria-label="Daily inspiration">
+          <div><div class="nova-quote-label">Today’s shelf note</div><div id="novaDailyQuote" class="nova-daily-quote"></div></div>
+          <div class="nova-quote-meta">
+            <select id="novaQuoteQuickCategory" aria-label="Quote theme">
+              <option value="focus">Focus</option><option value="calm">Calm</option><option value="creativity">Creativity</option><option value="courage">Courage</option>
+            </select>
+            <button id="novaShuffleQuote" type="button">Shuffle</button>
+            <button id="novaCustomizeQuotes" type="button">My quotes</button>
+          </div>
+        </section>
+        <section class="nova-art-card" aria-label="Decorative library art">
+          <svg viewBox="0 0 240 140" role="img" aria-label="Pastel books and botanical line art">
+            <rect x="25" y="101" width="188" height="7" rx="3.5" fill="#7b7096" opacity=".42"/>
+            <rect x="43" y="45" width="28" height="56" rx="5" fill="#d9b0c3"/>
+            <rect x="74" y="34" width="35" height="67" rx="5" fill="#a9c2ea"/>
+            <rect x="112" y="52" width="27" height="49" rx="5" fill="#edd68f"/>
+            <rect x="142" y="40" width="34" height="61" rx="5" fill="#b7ddca"/>
+            <path d="M179 100 C187 77 197 64 214 55" fill="none" stroke="#776d90" stroke-width="3" stroke-linecap="round"/>
+            <path d="M195 77 C188 68 185 60 187 52 C197 55 202 63 195 77Z" fill="#e7b6cb"/>
+            <path d="M204 66 C207 54 213 47 222 44 C224 54 219 63 204 66Z" fill="#c6b9ed"/>
+            <circle cx="31" cy="29" r="12" fill="#f4c8ac" opacity=".8"/>
+            <path d="M25 29h12M31 23v12" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <span class="nova-art-note">make space for ideas</span>
+        </section>`;
+      dash.insertBefore(row, openstage);
+      $q('novaQuoteQuickCategory').onchange = () => {
+        const prefs = loadPrefs(); prefs.category = $q('novaQuoteQuickCategory').value; savePrefs(prefs); shuffleOffset = 0; renderQuote();
+      };
+      $q('novaShuffleQuote').onclick = () => { shuffleOffset += 1; renderQuote(); };
+      $q('novaCustomizeQuotes').onclick = openQuoteModal;
+    }
+    renderQuote();
+  }
+
+  mountInspiration();
+  setTimeout(mountInspiration, 250);
+  if (typeof sb !== 'undefined' && sb?.auth?.onAuthStateChange) {
+    sb.auth.onAuthStateChange(() => setTimeout(() => { mountInspiration(); renderQuote(); }, 50));
+  }
+  const observer = new MutationObserver(() => {
+    if (document.querySelector('#s3.screen.active')) mountInspiration();
+  });
+  observer.observe(document.body, { attributes: true, subtree: true, attributeFilter: ['class'] });
 })();
