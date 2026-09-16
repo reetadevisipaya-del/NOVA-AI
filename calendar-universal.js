@@ -64,6 +64,8 @@
   const STYLE_ID = 'novaPersonalShelfStyles';
   const CARD_ID = 'novaPersonalImageCard';
   const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
+  let loadedUserId = '__unset__';
+  let loadingImage = false;
 
   function ensureStyles() {
     if (document.getElementById(STYLE_ID)) return;
@@ -260,37 +262,6 @@
       : '<div class="nova-profile-placeholder">Add a photo, artwork, place, or anything that makes this space feel like yours.</div>';
   }
 
-  async function loadStoredImage() {
-    const frame = document.getElementById('novaProfileFrame');
-    const remove = document.getElementById('novaProfileRemove');
-    const status = document.getElementById('novaProfileStatus');
-    if (!frame) return;
-
-    if (!currentUser) {
-      frame.innerHTML = frameMarkup('');
-      if (remove) remove.style.display = 'none';
-      if (status) status.textContent = 'Sign in to save your image.';
-      ensurePlusButton();
-      return;
-    }
-
-    try {
-      if (status) status.textContent = 'Loading your shelf…';
-      const { data, error } = await sb.from('profiles').select('avatar_url').eq('id', currentUser.id).maybeSingle();
-      if (error) throw error;
-      const image = data?.avatar_url || '';
-      frame.innerHTML = frameMarkup(image);
-      if (remove) remove.style.display = image ? 'inline-block' : 'none';
-      if (status) status.textContent = image ? 'Saved to your NOVA profile.' : 'Tap + to add your image.';
-      ensurePlusButton();
-    } catch (error) {
-      frame.innerHTML = frameMarkup('');
-      if (remove) remove.style.display = 'none';
-      if (status) status.textContent = 'Could not load image.';
-      ensurePlusButton();
-    }
-  }
-
   function ensurePlusButton() {
     const frame = document.getElementById('novaProfileFrame');
     if (!frame || frame.querySelector('.nova-profile-plus')) return;
@@ -308,6 +279,49 @@
       document.getElementById('novaProfileUpload')?.click();
     };
     frame.appendChild(plus);
+  }
+
+  async function loadStoredImage(force = false) {
+    const frame = document.getElementById('novaProfileFrame');
+    const remove = document.getElementById('novaProfileRemove');
+    const status = document.getElementById('novaProfileStatus');
+    if (!frame || loadingImage) return;
+
+    const userId = currentUser?.id || null;
+    if (!force && loadedUserId === userId && frame.dataset.ready === '1') return;
+
+    loadingImage = true;
+    try {
+      if (!userId) {
+        frame.innerHTML = frameMarkup('');
+        if (remove) remove.style.display = 'none';
+        if (status) status.textContent = 'Sign in to save your image.';
+        loadedUserId = null;
+        frame.dataset.ready = '1';
+        ensurePlusButton();
+        return;
+      }
+
+      if (status) status.textContent = 'Loading your shelf…';
+      const { data, error } = await sb.from('profiles').select('avatar_url').eq('id', userId).maybeSingle();
+      if (error) throw error;
+      const image = data?.avatar_url || '';
+      frame.innerHTML = frameMarkup(image);
+      if (remove) remove.style.display = image ? 'inline-block' : 'none';
+      if (status) status.textContent = image ? 'Saved to your NOVA profile.' : 'Tap + to add your image.';
+      loadedUserId = userId;
+      frame.dataset.ready = '1';
+      ensurePlusButton();
+    } catch (error) {
+      frame.innerHTML = frameMarkup('');
+      if (remove) remove.style.display = 'none';
+      if (status) status.textContent = 'Could not load image.';
+      loadedUserId = userId;
+      frame.dataset.ready = '1';
+      ensurePlusButton();
+    } finally {
+      loadingImage = false;
+    }
   }
 
   function compressImage(file) {
@@ -367,7 +381,9 @@
         updated_at: new Date().toISOString()
       }, { onConflict: 'id' });
       if (error) throw error;
-      await loadStoredImage();
+      loadedUserId = '__refresh__';
+      document.getElementById('novaProfileFrame')?.removeAttribute('data-ready');
+      await loadStoredImage(true);
     } catch (error) {
       if (status) status.textContent = error?.message || 'Could not save image.';
     }
@@ -383,7 +399,9 @@
         updated_at: new Date().toISOString()
       }).eq('id', currentUser.id);
       if (error) throw error;
-      await loadStoredImage();
+      loadedUserId = '__refresh__';
+      document.getElementById('novaProfileFrame')?.removeAttribute('data-ready');
+      await loadStoredImage(true);
     } catch (error) {
       if (status) status.textContent = error?.message || 'Could not remove image.';
     }
@@ -395,7 +413,9 @@
     if (!row) return;
 
     let card = document.getElementById(CARD_ID);
+    let created = false;
     if (!card) {
+      created = true;
       card = document.createElement('section');
       card.id = CARD_ID;
       card.className = 'nova-profile-card';
@@ -419,7 +439,8 @@
       document.getElementById('novaProfileRemove').onclick = () => void removeImage();
     }
 
-    void loadStoredImage();
+    if (created || loadedUserId !== (currentUser?.id || null)) void loadStoredImage();
+    else ensurePlusButton();
   }
 
   ensureStyles();
@@ -427,9 +448,14 @@
   setTimeout(mountPersonalShelf, 900);
 
   const observer = new MutationObserver(() => {
-    if (document.getElementById('novaInspirationRow')) mountPersonalShelf();
+    if (document.getElementById('novaInspirationRow') && !document.getElementById(CARD_ID)) mountPersonalShelf();
   });
   observer.observe(document.body, { childList: true, subtree: true });
 
-  sb.auth.onAuthStateChange(() => setTimeout(mountPersonalShelf, 80));
+  sb.auth.onAuthStateChange(() => {
+    loadedUserId = '__auth-change__';
+    const frame = document.getElementById('novaProfileFrame');
+    if (frame) frame.removeAttribute('data-ready');
+    setTimeout(mountPersonalShelf, 80);
+  });
 })();
