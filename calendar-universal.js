@@ -1,496 +1,223 @@
-/* NOVA universal built-in calendar UI. Loaded after calendar-sync.js. */
+/* NOVA final UI layer.
+   Loads the last stable personal-shelf/calendar enhancement bundle, then applies
+   the simplified action model requested for the final portfolio build. */
 (() => {
   'use strict';
 
-  const setupCalendar = document.querySelector('.permission[data-app="Calendar"]');
-  const setupCalendarStatusId = 'setupCalendarStatus';
+  const STABLE_BUNDLE = 'https://cdn.jsdelivr.net/gh/reetadevisipaya-del/NOVA-AI@5e654d994d7361b0f55db74ef70ed287ba11eaf4/calendar-universal.js';
+  const STYLE_ID = 'novaFinalActionStyles';
+  const CREATE_MODAL_ID = 'novaCreateChoiceModal';
 
-  function updateUniversalCalendarUI() {
-    const signedIn = !!currentUser;
-    if (calendarBtn) {
-      calendarBtn.style.display = signedIn ? 'inline-block' : 'none';
-      calendarBtn.setAttribute('aria-hidden', signedIn ? 'false' : 'true');
-      calendarBtn.textContent = 'Calendar';
-      calendarBtn.title = 'Import, export or manage your NOVA calendar';
-    }
-    if (!setupCalendar) return;
-    setupCalendar.classList.toggle('active', signedIn);
-    setupCalendar.setAttribute('aria-pressed', signedIn ? 'true' : 'false');
-    const status = document.getElementById(setupCalendarStatusId);
-    if (status) status.textContent = signedIn
-      ? 'Built-in NOVA calendar · no Google connection required'
-      : 'Available to every NOVA user · sign in to use';
+  function loadStableBundle(done) {
+    const script = document.createElement('script');
+    script.src = STABLE_BUNDLE;
+    script.async = false;
+    script.onload = () => done();
+    script.onerror = () => done();
+    document.head.appendChild(script);
   }
-
-  if (setupCalendar) {
-    const label = setupCalendar.querySelector('span:first-child');
-    if (label) label.innerHTML = '<b>NOVA Calendar</b><small id="' + setupCalendarStatusId + '">Available to every NOVA user · sign in to use</small>';
-    setupCalendar.onclick = event => {
-      event.preventDefault();
-      event.stopPropagation();
-      if (!currentUser) return openAuth('login');
-      calendarBtn?.click();
-    };
-  }
-
-  const priorRenderCalendarButton = renderCalendarButton;
-  renderCalendarButton = function () {
-    priorRenderCalendarButton();
-    updateUniversalCalendarUI();
-  };
-
-  sb.auth.onAuthStateChange(() => setTimeout(updateUniversalCalendarUI, 0));
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') updateUniversalCalendarUI();
-  });
-  updateUniversalCalendarUI();
-})();
-
-/* NOVA personal inspiration image + readability polish. */
-(() => {
-  'use strict';
-
-  const STYLE_ID = 'novaPersonalShelfStyles';
-  const CARD_ID = 'novaPersonalImageCard';
-  const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
-  let loadedUserId = '__unset__';
-  let loadingImage = false;
 
   function ensureStyles() {
     if (document.getElementById(STYLE_ID)) return;
     const style = document.createElement('style');
     style.id = STYLE_ID;
     style.textContent = `
-      .nova-inspiration-row{
-        grid-template-columns:minmax(0,1.45fr) minmax(190px,.62fr) minmax(210px,.68fr)!important;
-        gap:16px!important;
-        align-items:stretch!important;
-        padding:4px 0 10px;
+      /* Remove Calendar and Schedule from the top bar completely. */
+      #calendarBtn,#novaScheduleBtn{display:none!important}
+      #addEventBtn,#addTaskBtn{display:none!important}
+
+      /* Bold, pastel, high-contrast action styling. */
+      .nova-create-btn,.nova-add-calendar-btn{
+        font-weight:800!important;
+        letter-spacing:.01em;
+        border:1px solid rgba(113,96,151,.26)!important;
+        box-shadow:0 9px 22px rgba(81,68,116,.11)!important;
+        transition:transform .16s ease,box-shadow .16s ease;
       }
-      .nova-quote-card,.nova-art-card,.nova-profile-card{
-        min-height:190px!important;
-        border-radius:24px!important;
-        border:1px solid rgba(173,159,201,.28)!important;
-        box-shadow:0 16px 34px rgba(83,71,112,.09)!important;
+      .nova-create-btn{
+        background:linear-gradient(135deg,#f5dceb 0%,#eadfff 48%,#dceaff 100%)!important;
+        color:#4c4059!important;
       }
-      .nova-quote-card{
-        padding:22px 24px!important;
-        background:radial-gradient(circle at 12% 10%,rgba(255,255,255,.78),transparent 25%),linear-gradient(135deg,#fff1bd 0%,#fff8dd 48%,#ffe4d6 100%)!important;
+      .nova-add-calendar-btn{
+        background:linear-gradient(135deg,#fff0b9 0%,#ffe0d1 52%,#ead9ff 100%)!important;
+        color:#4a4054!important;
       }
-      .nova-quote-card:before{content:"";position:absolute;inset:12px;border:1px dashed rgba(122,108,168,.14);border-radius:17px;pointer-events:none}
-      .nova-quote-label{font-size:11px!important;letter-spacing:.14em!important;color:#76677f!important}
-      .nova-daily-quote{font-size:21px!important;line-height:1.48!important;font-weight:650!important;letter-spacing:-.012em!important;color:#3f3a4a!important;max-width:96%!important;position:relative;z-index:1}
-      .nova-quote-meta{position:relative;z-index:1}
-      .nova-quote-meta select,.nova-quote-meta button{height:36px!important;border-radius:11px!important;background:rgba(255,255,255,.68)!important;backdrop-filter:blur(8px)}
-
-      .nova-profile-card{
-        position:relative;
-        overflow:hidden;
-        display:flex;
-        flex-direction:column;
-        align-items:center;
-        justify-content:center;
-        text-align:center;
-        padding:24px 18px 18px;
-        background:radial-gradient(circle at 88% 12%,rgba(255,255,255,.74),transparent 24%),linear-gradient(145deg,#f7dcea 0%,#efe7ff 52%,#ddeaff 100%);
+      .nova-create-btn:hover,.nova-add-calendar-btn:hover{
+        transform:translateY(-1px);
+        box-shadow:0 12px 28px rgba(81,68,116,.16)!important;
       }
-      .nova-profile-card:before{content:"PERSONAL SHELF";position:absolute;left:16px;top:14px;font-size:10px;line-height:1;font-weight:700;letter-spacing:.14em;color:#776987}
-      .nova-profile-frame{position:relative;width:104px;height:104px;border-radius:20px;overflow:visible;margin:8px auto 12px;background:rgba(255,255,255,.66);border:5px solid rgba(255,255,255,.88);box-shadow:0 12px 28px rgba(96,80,127,.14),0 0 0 1px rgba(122,108,168,.12);transform:rotate(-1deg)}
-      .nova-profile-frame:after{content:"";position:absolute;left:12px;right:12px;bottom:-9px;height:10px;border-radius:50%;background:rgba(77,65,104,.08);filter:blur(5px);z-index:-1}
-      .nova-profile-frame img{width:100%;height:100%;display:block;object-fit:cover;border-radius:15px}
-      .nova-profile-placeholder{width:100%;height:100%;border-radius:15px;display:grid;place-items:center;padding:13px;color:#756d80;font-size:12px;line-height:1.35;background:linear-gradient(145deg,rgba(255,255,255,.7),rgba(237,231,255,.7))}
-      .nova-profile-plus{position:absolute;right:-10px;bottom:-10px;width:36px;height:36px;padding:0!important;border:3px solid #fff!important;border-radius:50%!important;display:grid;place-items:center;background:linear-gradient(135deg,#75659f,#9a8bc4)!important;color:#fff!important;font-size:23px!important;font-weight:500!important;line-height:1!important;box-shadow:0 8px 16px rgba(90,72,129,.24)!important;cursor:pointer}
-      .nova-profile-plus:hover{transform:translateY(-1px) scale(1.04)!important}
-      .nova-profile-title{font-size:15px;font-weight:700;color:#433d50;line-height:1.25}
-      .nova-profile-copy{font-size:11px;line-height:1.45;color:#746d7e;margin-top:4px;max-width:180px}
-      .nova-profile-actions{display:flex;align-items:center;gap:8px;margin-top:8px}
-      .nova-profile-remove{border:0;background:transparent;color:#a25f73;font-size:11px;font-weight:700;padding:4px 6px;cursor:pointer}
-      .nova-profile-status{font-size:10px;color:#6e6878;min-height:14px;margin-top:3px}
 
-      /* Once a user adds an image, it becomes the entire card. */
-      .nova-profile-card.has-image{padding:0!important;background:#e8e1ef!important}
-      .nova-profile-card.has-image:before{display:none!important}
-      .nova-profile-card.has-image .nova-profile-frame{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;margin:0!important;border:0!important;border-radius:24px!important;box-shadow:none!important;transform:none!important;overflow:hidden!important;background:#ddd!important}
-      .nova-profile-card.has-image .nova-profile-frame:after{display:none!important}
-      .nova-profile-card.has-image .nova-profile-frame img{width:100%!important;height:100%!important;object-fit:cover!important;border-radius:24px!important}
-      .nova-profile-card.has-image .nova-profile-title,.nova-profile-card.has-image .nova-profile-copy,.nova-profile-card.has-image .nova-profile-status{display:none!important}
-      .nova-profile-card.has-image .nova-profile-actions{position:absolute!important;top:12px!important;right:12px!important;z-index:5!important;margin:0!important}
-      .nova-profile-card.has-image .nova-profile-remove{display:block!important;background:rgba(255,255,255,.84)!important;color:#755c70!important;border:1px solid rgba(255,255,255,.8)!important;border-radius:999px!important;padding:6px 10px!important;box-shadow:0 6px 16px rgba(43,35,56,.12)!important;backdrop-filter:blur(8px)}
-      .nova-profile-card.has-image .nova-profile-plus{right:14px!important;bottom:14px!important;z-index:6!important;box-shadow:0 8px 20px rgba(54,42,79,.28)!important}
+      .nova-create-overlay{position:fixed;inset:0;z-index:10020;display:none;place-items:center;padding:18px;background:rgba(24,20,31,.58);backdrop-filter:blur(8px)}
+      .nova-create-overlay.open{display:grid}
+      .nova-create-card{width:min(470px,100%);padding:24px;border:1px solid rgba(124,108,158,.24);border-radius:26px;background:var(--surface,#fff);box-shadow:0 28px 75px rgba(45,35,65,.24)}
+      .nova-create-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:18px}
+      .nova-create-head h2{font-size:29px!important;font-weight:800!important;letter-spacing:-.025em}
+      .nova-create-head p{margin-top:5px!important;font-size:12px!important;font-weight:600!important;line-height:1.55!important;color:var(--muted,#777)!important}
+      .nova-create-close{width:38px;height:38px;border:0;border-radius:12px;background:#efe7f7;color:#57496a;font-size:20px;font-weight:800;cursor:pointer}
+      .nova-create-options{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+      .nova-create-option{min-height:128px;padding:18px;text-align:left;border-radius:19px;border:1px solid rgba(121,104,155,.2);cursor:pointer;transition:.16s;box-shadow:0 9px 20px rgba(87,72,119,.07)}
+      .nova-create-option:hover{transform:translateY(-2px);box-shadow:0 13px 26px rgba(87,72,119,.12)}
+      .nova-create-option.task{background:linear-gradient(145deg,#e6ddff,#dbe9ff)}
+      .nova-create-option.event{background:linear-gradient(145deg,#ffe2d3,#fff0b8)}
+      .nova-create-option .nova-option-icon{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;margin-bottom:13px;background:rgba(255,255,255,.76);font-size:18px;font-weight:900;color:#51435f}
+      .nova-create-option b{display:block;font-size:15px;font-weight:800;color:#41364d;margin-bottom:4px}
+      .nova-create-option small{display:block;font-size:11px;font-weight:600;line-height:1.5;color:#706477}
 
-      .nova-art-card{background:linear-gradient(145deg,rgba(255,255,255,.25),transparent 34%),linear-gradient(145deg,#e8e1ff,#dfeaff 52%,#f8dbe7)!important}
-      .nova-art-card:before{content:"READING ROOM";position:absolute;left:14px;top:12px;font-size:10px;font-weight:700;letter-spacing:.14em;color:#776d90;opacity:.8}
-      .nova-art-note{font-size:10px!important;letter-spacing:.02em}
-      .nova-inspiration-row:after{content:"";grid-column:1/-1;height:7px;margin-top:-6px;border-radius:999px;background:linear-gradient(90deg,#d3c4ef 0 20%,#bdd1f0 20% 43%,#f3bfd4 43% 66%,#f1d993 66% 82%,#bfe1d0 82%);box-shadow:0 4px 9px rgba(86,75,112,.08);opacity:.68}
+      /* Make key interface text stronger without losing the pastel aesthetic. */
+      .topbar .actions .btn,.dashbuttons .btn,.kicker,.value b,.stat b,.assistant-head h2,.date,.plan b{font-weight:800!important}
+      .quick button,.mini{font-weight:700!important}
 
-      /* Diary: bolder, cleaner and less crowded. */
-      .openpages{line-height:1.65!important}
-      .date{font-size:30px!important;font-weight:700!important;line-height:1.2!important;margin-bottom:10px!important;letter-spacing:-.03em!important}
-      .plan-note{font-size:14px!important;font-weight:500!important;line-height:1.65!important;margin-bottom:18px!important;max-width:92%!important}
-      .plan{min-height:82px!important;gap:14px!important;padding:8px 0!important}
-      .plan b{font-size:16px!important;font-weight:700!important;line-height:1.35!important;letter-spacing:-.01em!important}
-      .plan small{font-size:13px!important;font-weight:500!important;line-height:1.5!important;margin-top:4px!important}
-      .plan time{font-size:13px!important;font-weight:600!important}
-      .whybox{font-size:13px!important;line-height:1.6!important;padding:10px 12px!important;margin-top:7px!important}
-      .journal-entry-toolbar{padding:16px 18px!important;margin-bottom:20px!important}
-      .journal-entry-toolbar .journal-copy{font-size:14px!important;font-weight:500!important;line-height:1.55!important}
-      .journal-entry-toolbar .journal-copy strong{font-size:16px!important;font-weight:700!important;line-height:1.35!important;margin-bottom:3px!important}
-      .journal-footer{padding-top:18px!important;margin-top:22px!important}
-      .journal-footer-copy{font-size:14px!important;font-weight:500!important;line-height:1.55!important}
-      .journal-footer-copy strong{font-size:16px!important;font-weight:700!important;margin-bottom:3px!important}
-      .focus{margin-top:20px!important;padding:18px 20px!important}
-      .focus b{font-size:16px!important;font-weight:700!important;line-height:1.4!important}
-      .focus small{font-size:12.5px!important;font-weight:500!important;line-height:1.5!important}
-      .stats{margin-top:18px!important;gap:12px!important}
-      .stat{padding:16px!important}.stat b{font-weight:700!important}.stat small{font-size:12.5px!important;font-weight:500!important}
+      body.dark .nova-create-btn{background:linear-gradient(135deg,#533f55,#463b68)!important;color:#fff4fb!important}
+      body.dark .nova-add-calendar-btn{background:linear-gradient(135deg,#65513c,#5a4056)!important;color:#fff5ea!important}
+      body.dark .nova-create-option.task{background:linear-gradient(145deg,#493e63,#384d68)}
+      body.dark .nova-create-option.event{background:linear-gradient(145deg,#654638,#64543b)}
+      body.dark .nova-create-option b,body.dark .nova-create-option small{color:#f6f0ff}
+      body.dark .nova-create-close{background:#40364b;color:#fff}
 
-      /* Assistant: more readable hierarchy and breathing room. */
-      .assistant{padding:30px!important}
-      .assistant-head{padding-bottom:20px!important}
-      .assistant-head h2{font-size:29px!important;font-weight:700!important;line-height:1.25!important;letter-spacing:-.025em!important}
-      .assistant-head p{font-size:14px!important;font-weight:500!important;line-height:1.65!important;margin-top:7px!important}
-      .messages{gap:12px!important;padding:20px 0!important;max-height:520px!important}
-      .msg{font-size:15px!important;font-weight:500!important;line-height:1.65!important;padding:13px 15px!important;max-width:92%!important}
-      .quick{gap:8px!important;margin-bottom:13px!important}
-      .quick button{font-size:12.5px!important;font-weight:600!important;padding:8px 11px!important}
-      .chat{gap:9px!important}
-      .chat input{font-size:15px!important;font-weight:500!important;padding:0 14px!important;height:48px!important}
-      .chat button{height:48px!important;width:48px!important;font-size:17px!important}
-
-      body.dark .nova-profile-card{background:linear-gradient(145deg,#573e4d,#403a56 52%,#35465e)}
-      body.dark .nova-profile-title{color:#f6f1ff}.nova-profile-copy{color:var(--muted)}
-      body.dark .nova-profile-placeholder{background:rgba(255,255,255,.07);color:#d7cfe4}
-
-      @media(max-width:1180px){
-        .nova-inspiration-row{grid-template-columns:minmax(0,1.3fr) minmax(190px,.7fr)!important}
-        .nova-art-card{grid-column:1/-1;min-height:145px!important}
-      }
-      @media(max-width:760px){
-        .nova-inspiration-row{grid-template-columns:1fr!important}
-        .nova-profile-card,.nova-art-card{grid-column:auto!important;min-height:190px!important}
-        .nova-daily-quote{font-size:19px!important}
-        .assistant{padding:20px!important}
-        .msg{font-size:14px!important}
-        .plan{min-height:76px!important}
-        .plan b{font-size:15px!important}
+      @media(max-width:620px){
+        .nova-create-options{grid-template-columns:1fr}
+        .nova-create-option{min-height:112px}
       }
     `;
     document.head.appendChild(style);
   }
 
-  function frameMarkup(dataUrl) {
-    return dataUrl
-      ? `<img src="${dataUrl}" alt="Your personal inspiration image">`
-      : '<div class="nova-profile-placeholder">Add a photo, artwork, place, or anything that makes this space feel like yours.</div>';
-  }
-
-  function ensurePlusButton() {
-    const frame = document.getElementById('novaProfileFrame');
-    if (!frame || frame.querySelector('.nova-profile-plus')) return;
-    const plus = document.createElement('button');
-    plus.type = 'button';
-    plus.className = 'nova-profile-plus';
-    plus.setAttribute('aria-label', 'Add or change your personal image');
-    plus.title = 'Add or change your image';
-    plus.textContent = '+';
-    plus.onclick = () => {
-      if (!currentUser) return typeof openAuth === 'function' && openAuth('login');
-      document.getElementById('novaProfileUpload')?.click();
-    };
-    frame.appendChild(plus);
-  }
-
-  function setImageState(hasImage) {
-    const card = document.getElementById(CARD_ID);
-    if (card) card.classList.toggle('has-image', !!hasImage);
-  }
-
-  async function loadStoredImage(force = false) {
-    const frame = document.getElementById('novaProfileFrame');
-    const remove = document.getElementById('novaProfileRemove');
-    const status = document.getElementById('novaProfileStatus');
-    if (!frame || loadingImage) return;
-
-    const userId = currentUser?.id || null;
-    if (!force && loadedUserId === userId && frame.dataset.ready === '1') return;
-    loadingImage = true;
-
-    try {
-      if (!userId) {
-        frame.innerHTML = frameMarkup('');
-        setImageState(false);
-        if (remove) remove.style.display = 'none';
-        if (status) status.textContent = 'Sign in to save your image.';
-        loadedUserId = null;
-        frame.dataset.ready = '1';
-        ensurePlusButton();
-        return;
-      }
-
-      if (status) status.textContent = 'Loading your shelf…';
-      const { data, error } = await sb.from('profiles').select('avatar_url').eq('id', userId).maybeSingle();
-      if (error) throw error;
-      const image = data?.avatar_url || '';
-      frame.innerHTML = frameMarkup(image);
-      setImageState(!!image);
-      if (remove) remove.style.display = image ? 'inline-block' : 'none';
-      if (status) status.textContent = image ? '' : 'Tap + to add your image.';
-      loadedUserId = userId;
-      frame.dataset.ready = '1';
-      ensurePlusButton();
-    } catch (error) {
-      frame.innerHTML = frameMarkup('');
-      setImageState(false);
-      if (remove) remove.style.display = 'none';
-      if (status) status.textContent = 'Could not load image.';
-      loadedUserId = userId;
-      frame.dataset.ready = '1';
-      ensurePlusButton();
-    } finally {
-      loadingImage = false;
-    }
-  }
-
-  function compressImage(file) {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      const objectUrl = URL.createObjectURL(file);
-      img.onload = () => {
-        try {
-          const sourceW = img.naturalWidth || img.width;
-          const sourceH = img.naturalHeight || img.height;
-          const side = Math.min(sourceW, sourceH);
-          const sx = Math.max(0, (sourceW - side) / 2);
-          const sy = Math.max(0, (sourceH - side) / 2);
-          const output = Math.min(900, side);
-          const canvas = document.createElement('canvas');
-          canvas.width = output;
-          canvas.height = output;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, sx, sy, side, side, 0, 0, output, output);
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.84);
-          URL.revokeObjectURL(objectUrl);
-          resolve(dataUrl);
-        } catch (error) {
-          URL.revokeObjectURL(objectUrl);
-          reject(error);
-        }
-      };
-      img.onerror = () => {
-        URL.revokeObjectURL(objectUrl);
-        reject(new Error('Could not read this image.'));
-      };
-      img.src = objectUrl;
-    });
-  }
-
-  async function handleUpload(file) {
-    const status = document.getElementById('novaProfileStatus');
-    if (!currentUser) return typeof openAuth === 'function' && openAuth('login');
-    if (!file || !file.type.startsWith('image/')) {
-      if (status) status.textContent = 'Choose an image file.';
-      return;
-    }
-    if (file.size > MAX_UPLOAD_BYTES) {
-      if (status) status.textContent = 'Choose an image smaller than 8 MB.';
-      return;
-    }
-
-    try {
-      if (status) status.textContent = 'Saving your image…';
-      const dataUrl = await compressImage(file);
-      const { error } = await sb.from('profiles').upsert({
-        id: currentUser.id,
-        avatar_url: dataUrl,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'id' });
-      if (error) throw error;
-      loadedUserId = '__refresh__';
-      document.getElementById('novaProfileFrame')?.removeAttribute('data-ready');
-      await loadStoredImage(true);
-    } catch (error) {
-      if (status) status.textContent = error?.message || 'Could not save image.';
-    }
-  }
-
-  async function removeImage() {
-    if (!currentUser) return;
-    const status = document.getElementById('novaProfileStatus');
-    try {
-      if (status) status.textContent = 'Removing image…';
-      const { error } = await sb.from('profiles').update({
-        avatar_url: null,
-        updated_at: new Date().toISOString()
-      }).eq('id', currentUser.id);
-      if (error) throw error;
-      loadedUserId = '__refresh__';
-      document.getElementById('novaProfileFrame')?.removeAttribute('data-ready');
-      await loadStoredImage(true);
-    } catch (error) {
-      if (status) status.textContent = error?.message || 'Could not remove image.';
-    }
-  }
-
-  function mountPersonalShelf() {
-    ensureStyles();
-    const row = document.getElementById('novaInspirationRow');
-    if (!row) return;
-
-    let card = document.getElementById(CARD_ID);
-    let created = false;
-    if (!card) {
-      created = true;
-      card = document.createElement('section');
-      card.id = CARD_ID;
-      card.className = 'nova-profile-card';
-      card.setAttribute('aria-label', 'Personal inspiration image');
-      card.innerHTML = `
-        <div id="novaProfileFrame" class="nova-profile-frame"></div>
-        <div class="nova-profile-title">Your visual note</div>
-        <div class="nova-profile-copy">Keep one image beside today’s quote — a memory, place, artwork or goal.</div>
-        <div class="nova-profile-actions"><button id="novaProfileRemove" class="nova-profile-remove" type="button" style="display:none">Remove</button></div>
-        <div id="novaProfileStatus" class="nova-profile-status"></div>
-        <input id="novaProfileUpload" type="file" accept="image/*" hidden>`;
-      const art = row.querySelector('.nova-art-card');
-      if (art) row.insertBefore(card, art); else row.appendChild(card);
-
-      document.getElementById('novaProfileUpload').addEventListener('change', event => {
-        const file = event.target.files?.[0];
-        event.target.value = '';
-        if (file) void handleUpload(file);
-      });
-      document.getElementById('novaProfileRemove').onclick = () => void removeImage();
-    }
-
-    if (created || loadedUserId !== (currentUser?.id || null)) void loadStoredImage();
-    else ensurePlusButton();
-  }
-
-  ensureStyles();
-  setTimeout(mountPersonalShelf, 320);
-  setTimeout(mountPersonalShelf, 900);
-
-  const observer = new MutationObserver(() => {
-    if (document.getElementById('novaInspirationRow') && !document.getElementById(CARD_ID)) mountPersonalShelf();
-  });
-  observer.observe(document.body, { childList: true, subtree: true });
-
-  sb.auth.onAuthStateChange(() => {
-    loadedUserId = '__auth-change__';
-    const frame = document.getElementById('novaProfileFrame');
-    if (frame) frame.removeAttribute('data-ready');
-    setTimeout(mountPersonalShelf, 80);
-  });
-})();
-
-/* NOVA scheduling integration powered by Cal.com. */
-(() => {
-  'use strict';
-
-  const CAL_URL = 'https://cal.com/reeta-devi-op8mu0';
-  const CAL_EMBED_URL = CAL_URL + '?embed=true&layout=month_view';
-  const STYLE_ID = 'novaCalSchedulerStyles';
-  const MODAL_ID = 'novaCalSchedulerModal';
-
-  function ensureStyles() {
-    if (document.getElementById(STYLE_ID)) return;
-    const style = document.createElement('style');
-    style.id = STYLE_ID;
-    style.textContent = `
-      .nova-schedule-btn{background:linear-gradient(135deg,#efe7ff,#dfeaff)!important;border:1px solid rgba(123,106,166,.22)!important;color:#554b69!important;box-shadow:0 8px 20px rgba(91,76,130,.08)}
-      .nova-schedule-btn:hover{transform:translateY(-1px);box-shadow:0 10px 24px rgba(91,76,130,.13)}
-      .nova-schedule-accent{background:linear-gradient(135deg,#7968a6,#5f7ea7)!important;color:#fff!important;border:0!important;box-shadow:0 10px 24px rgba(91,76,130,.18)!important}
-      .nova-cal-overlay{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;padding:18px;background:rgba(22,20,29,.64);backdrop-filter:blur(10px)}
-      .nova-cal-overlay.open{display:flex}
-      .nova-cal-shell{width:min(1120px,100%);height:min(820px,92vh);display:flex;flex-direction:column;overflow:hidden;background:var(--surface,#fff);border:1px solid var(--line,#ddd);border-radius:26px;box-shadow:0 30px 90px rgba(23,18,34,.3)}
-      .nova-cal-head{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:16px 18px;border-bottom:1px solid var(--line,#ddd);background:linear-gradient(135deg,color-mix(in srgb,var(--surface,#fff) 92%,#efe7ff),color-mix(in srgb,var(--surface,#fff) 92%,#dfeaff))}
-      .nova-cal-title{display:flex;flex-direction:column;gap:3px;min-width:0}.nova-cal-title strong{font-size:15px;color:var(--ink,#222)}.nova-cal-title span{font-size:11px;color:var(--muted,#777)}
-      .nova-cal-head-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.nova-cal-head-actions a{font-size:11px;font-weight:700;text-decoration:none;color:var(--accent,#496b61);padding:9px 11px;border:1px solid var(--line,#ddd);border-radius:11px;background:var(--surface,#fff)}
-      .nova-cal-close{width:38px;height:38px;border:0;border-radius:12px;background:var(--ink,#222);color:var(--surface,#fff);font-size:20px;line-height:1;cursor:pointer}
-      .nova-cal-frame{width:100%;height:100%;border:0;background:#fff;flex:1}
-      .nova-cal-note{padding:8px 14px;border-top:1px solid var(--line,#ddd);font-size:10px;line-height:1.5;color:var(--muted,#777);background:var(--surface,#fff)}
-      body.dark .nova-schedule-btn{background:linear-gradient(135deg,#413650,#35465d)!important;color:#f2ecff!important;border-color:#544765!important}
-      @media(max-width:720px){.nova-cal-overlay{padding:0}.nova-cal-shell{width:100%;height:100vh;border-radius:0}.nova-cal-head{padding:12px}.nova-cal-title span{display:none}.nova-cal-head-actions a{display:none}}
-    `;
-    document.head.appendChild(style);
-  }
-
-  function ensureModal() {
-    let modal = document.getElementById(MODAL_ID);
-    if (modal) return modal;
-    modal = document.createElement('div');
-    modal.id = MODAL_ID;
-    modal.className = 'nova-cal-overlay';
-    modal.setAttribute('role', 'dialog');
-    modal.setAttribute('aria-modal', 'true');
-    modal.setAttribute('aria-label', 'Schedule a meeting');
-    modal.innerHTML = `
-      <div class="nova-cal-shell">
-        <div class="nova-cal-head">
-          <div class="nova-cal-title"><strong>Schedule with Reeta</strong><span>Choose an available time without leaving NOVA.</span></div>
-          <div class="nova-cal-head-actions">
-            <a href="${CAL_URL}" target="_blank" rel="noopener noreferrer">Open in Cal.com ↗</a>
-            <button class="nova-cal-close" type="button" aria-label="Close scheduler">×</button>
-          </div>
-        </div>
-        <iframe class="nova-cal-frame" title="Cal.com scheduling calendar" src="${CAL_EMBED_URL}" loading="lazy" allow="camera; microphone; fullscreen; clipboard-write"></iframe>
-        <div class="nova-cal-note">Scheduling is handled by Cal.com. If the embedded calendar does not load, use “Open in Cal.com”.</div>
-      </div>`;
-    document.body.appendChild(modal);
-    modal.querySelector('.nova-cal-close').onclick = () => closeScheduler();
-    modal.onclick = event => { if (event.target === modal) closeScheduler(); };
-    return modal;
-  }
-
-  function openScheduler() {
-    ensureStyles();
-    const modal = ensureModal();
-    modal.classList.add('open');
-    document.body.style.overflow = 'hidden';
-  }
-
-  function closeScheduler() {
-    const modal = document.getElementById(MODAL_ID);
-    if (!modal) return;
-    modal.classList.remove('open');
+  function closeCreateChoice() {
+    const modal = document.getElementById(CREATE_MODAL_ID);
+    if (modal) modal.classList.remove('open');
     document.body.style.overflow = '';
   }
 
-  function ensureButtons() {
-    ensureStyles();
-    const actions = document.querySelector('.topbar .actions');
-    if (actions && !document.getElementById('novaScheduleBtn')) {
-      const button = document.createElement('button');
-      button.id = 'novaScheduleBtn';
-      button.type = 'button';
-      button.className = 'btn secondary nova-schedule-btn';
-      button.textContent = 'Schedule';
-      button.title = 'Book a meeting with Cal.com';
-      button.onclick = openScheduler;
-      if (calendarBtn?.parentNode === actions) actions.insertBefore(button, calendarBtn.nextSibling);
-      else actions.prepend(button);
+  function ensureCreateModal() {
+    let modal = document.getElementById(CREATE_MODAL_ID);
+    if (modal) return modal;
+
+    modal = document.createElement('div');
+    modal.id = CREATE_MODAL_ID;
+    modal.className = 'nova-create-overlay';
+    modal.setAttribute('role','dialog');
+    modal.setAttribute('aria-modal','true');
+    modal.setAttribute('aria-label','Add task or event');
+    modal.innerHTML = `
+      <div class="nova-create-card">
+        <div class="nova-create-head">
+          <div><h2>Add something</h2><p>Choose what you want to add to your NOVA day.</p></div>
+          <button class="nova-create-close" type="button" aria-label="Close">×</button>
+        </div>
+        <div class="nova-create-options">
+          <button id="novaChooseTask" class="nova-create-option task" type="button">
+            <span class="nova-option-icon">✓</span><b>Add task</b><small>Create work NOVA can prioritise and place into your day.</small>
+          </button>
+          <button id="novaChooseEvent" class="nova-create-option event" type="button">
+            <span class="nova-option-icon">◷</span><b>Add event</b><small>Add a fixed calendar commitment that protects that time.</small>
+          </button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+
+    modal.querySelector('.nova-create-close').onclick = closeCreateChoice;
+    modal.onclick = event => { if (event.target === modal) closeCreateChoice(); };
+    modal.querySelector('#novaChooseTask').onclick = () => {
+      closeCreateChoice();
+      if (typeof addTaskBtn !== 'undefined' && addTaskBtn) addTaskBtn.click();
+    };
+    modal.querySelector('#novaChooseEvent').onclick = () => {
+      closeCreateChoice();
+      if (typeof addEventBtn !== 'undefined' && addEventBtn) addEventBtn.click();
+    };
+    return modal;
+  }
+
+  function openCreateChoice() {
+    if (typeof currentUser !== 'undefined' && !currentUser) {
+      if (typeof openAuth === 'function') openAuth('login');
+      return;
     }
+    ensureCreateModal().classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function syncTopControls() {
+    ensureStyles();
+
+    if (typeof calendarBtn !== 'undefined' && calendarBtn) {
+      calendarBtn.style.setProperty('display','none','important');
+      calendarBtn.setAttribute('aria-hidden','true');
+    }
+    document.getElementById('novaScheduleBtn')?.remove();
+
+    if (typeof addEventBtn === 'undefined' || typeof addTaskBtn === 'undefined') return;
+    addEventBtn.style.setProperty('display','none','important');
+    addTaskBtn.style.setProperty('display','none','important');
+
+    const actions = document.querySelector('.topbar .actions');
+    if (!actions) return;
+
+    let combined = document.getElementById('novaCreateBtn');
+    if (!combined) {
+      combined = document.createElement('button');
+      combined.id = 'novaCreateBtn';
+      combined.type = 'button';
+      combined.className = 'btn nova-create-btn';
+      combined.textContent = '+ Event / Task';
+      combined.title = 'Add a task or calendar event';
+      combined.onclick = openCreateChoice;
+      const anchor = document.getElementById('manageBtn') || document.getElementById('authBtn');
+      actions.insertBefore(combined, anchor || actions.firstChild);
+    }
+    combined.style.display = (typeof currentUser !== 'undefined' && currentUser) ? 'inline-block' : 'none';
+  }
+
+  function syncTodayCalendarButton() {
+    ensureStyles();
+    document.getElementById('novaScheduleTodayBtn')?.remove();
 
     const dashButtons = document.querySelector('.dashbuttons');
-    if (dashButtons && !document.getElementById('novaScheduleTodayBtn')) {
-      const button = document.createElement('button');
-      button.id = 'novaScheduleTodayBtn';
+    if (!dashButtons) return;
+
+    let button = document.getElementById('novaAddCalendarTodayBtn');
+    if (!button) {
+      button = document.createElement('button');
+      button.id = 'novaAddCalendarTodayBtn';
       button.type = 'button';
-      button.className = 'btn nova-schedule-accent';
-      button.textContent = 'Book time';
-      button.title = 'Open Cal.com scheduler';
-      button.onclick = openScheduler;
+      button.className = 'btn nova-add-calendar-btn';
+      button.textContent = 'Add to calendar';
+      button.title = 'Open NOVA calendar, Cal.com and .ics options';
+      button.onclick = () => {
+        if (typeof currentUser !== 'undefined' && !currentUser) {
+          if (typeof openAuth === 'function') openAuth('login');
+          return;
+        }
+        if (typeof calendarBtn !== 'undefined' && calendarBtn) calendarBtn.click();
+      };
       dashButtons.appendChild(button);
     }
   }
 
-  document.addEventListener('keydown', event => {
-    if (event.key === 'Escape') closeScheduler();
-  });
+  function initRefinement() {
+    ensureStyles();
+    syncTopControls();
+    syncTodayCalendarButton();
 
-  ensureButtons();
-  setTimeout(ensureButtons, 300);
-  setTimeout(ensureButtons, 1000);
-  const observer = new MutationObserver(ensureButtons);
-  observer.observe(document.body, { childList: true, subtree: true });
+    setTimeout(syncTopControls,120);
+    setTimeout(syncTodayCalendarButton,140);
+    setTimeout(syncTopControls,650);
+    setTimeout(syncTodayCalendarButton,700);
+
+    const observer = new MutationObserver(() => {
+      syncTopControls();
+      syncTodayCalendarButton();
+    });
+    observer.observe(document.body,{childList:true,subtree:true});
+
+    if (typeof sb !== 'undefined' && sb?.auth?.onAuthStateChange) {
+      sb.auth.onAuthStateChange(() => setTimeout(syncTopControls,0));
+    }
+
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape') closeCreateChoice();
+    });
+  }
+
+  loadStableBundle(initRefinement);
 })();
