@@ -382,3 +382,115 @@
     setTimeout(mountPersonalShelf, 80);
   });
 })();
+
+/* NOVA scheduling integration powered by Cal.com. */
+(() => {
+  'use strict';
+
+  const CAL_URL = 'https://cal.com/reeta-devi-op8mu0';
+  const CAL_EMBED_URL = CAL_URL + '?embed=true&layout=month_view';
+  const STYLE_ID = 'novaCalSchedulerStyles';
+  const MODAL_ID = 'novaCalSchedulerModal';
+
+  function ensureStyles() {
+    if (document.getElementById(STYLE_ID)) return;
+    const style = document.createElement('style');
+    style.id = STYLE_ID;
+    style.textContent = `
+      .nova-schedule-btn{background:linear-gradient(135deg,#efe7ff,#dfeaff)!important;border:1px solid rgba(123,106,166,.22)!important;color:#554b69!important;box-shadow:0 8px 20px rgba(91,76,130,.08)}
+      .nova-schedule-btn:hover{transform:translateY(-1px);box-shadow:0 10px 24px rgba(91,76,130,.13)}
+      .nova-schedule-accent{background:linear-gradient(135deg,#7968a6,#5f7ea7)!important;color:#fff!important;border:0!important;box-shadow:0 10px 24px rgba(91,76,130,.18)!important}
+      .nova-cal-overlay{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;padding:18px;background:rgba(22,20,29,.64);backdrop-filter:blur(10px)}
+      .nova-cal-overlay.open{display:flex}
+      .nova-cal-shell{width:min(1120px,100%);height:min(820px,92vh);display:flex;flex-direction:column;overflow:hidden;background:var(--surface,#fff);border:1px solid var(--line,#ddd);border-radius:26px;box-shadow:0 30px 90px rgba(23,18,34,.3)}
+      .nova-cal-head{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:16px 18px;border-bottom:1px solid var(--line,#ddd);background:linear-gradient(135deg,color-mix(in srgb,var(--surface,#fff) 92%,#efe7ff),color-mix(in srgb,var(--surface,#fff) 92%,#dfeaff))}
+      .nova-cal-title{display:flex;flex-direction:column;gap:3px;min-width:0}.nova-cal-title strong{font-size:15px;color:var(--ink,#222)}.nova-cal-title span{font-size:11px;color:var(--muted,#777)}
+      .nova-cal-head-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.nova-cal-head-actions a{font-size:11px;font-weight:700;text-decoration:none;color:var(--accent,#496b61);padding:9px 11px;border:1px solid var(--line,#ddd);border-radius:11px;background:var(--surface,#fff)}
+      .nova-cal-close{width:38px;height:38px;border:0;border-radius:12px;background:var(--ink,#222);color:var(--surface,#fff);font-size:20px;line-height:1;cursor:pointer}
+      .nova-cal-frame{width:100%;height:100%;border:0;background:#fff;flex:1}
+      .nova-cal-note{padding:8px 14px;border-top:1px solid var(--line,#ddd);font-size:10px;line-height:1.5;color:var(--muted,#777);background:var(--surface,#fff)}
+      body.dark .nova-schedule-btn{background:linear-gradient(135deg,#413650,#35465d)!important;color:#f2ecff!important;border-color:#544765!important}
+      @media(max-width:720px){.nova-cal-overlay{padding:0}.nova-cal-shell{width:100%;height:100vh;border-radius:0}.nova-cal-head{padding:12px}.nova-cal-title span{display:none}.nova-cal-head-actions a{display:none}}
+    `;
+    document.head.appendChild(style);
+  }
+
+  function ensureModal() {
+    let modal = document.getElementById(MODAL_ID);
+    if (modal) return modal;
+    modal = document.createElement('div');
+    modal.id = MODAL_ID;
+    modal.className = 'nova-cal-overlay';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', 'Schedule a meeting');
+    modal.innerHTML = `
+      <div class="nova-cal-shell">
+        <div class="nova-cal-head">
+          <div class="nova-cal-title"><strong>Schedule with Reeta</strong><span>Choose an available time without leaving NOVA.</span></div>
+          <div class="nova-cal-head-actions">
+            <a href="${CAL_URL}" target="_blank" rel="noopener noreferrer">Open in Cal.com ↗</a>
+            <button class="nova-cal-close" type="button" aria-label="Close scheduler">×</button>
+          </div>
+        </div>
+        <iframe class="nova-cal-frame" title="Cal.com scheduling calendar" src="${CAL_EMBED_URL}" loading="lazy" allow="camera; microphone; fullscreen; clipboard-write"></iframe>
+        <div class="nova-cal-note">Scheduling is handled by Cal.com. If the embedded calendar does not load, use “Open in Cal.com”.</div>
+      </div>`;
+    document.body.appendChild(modal);
+    modal.querySelector('.nova-cal-close').onclick = () => closeScheduler();
+    modal.onclick = event => { if (event.target === modal) closeScheduler(); };
+    return modal;
+  }
+
+  function openScheduler() {
+    ensureStyles();
+    const modal = ensureModal();
+    modal.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeScheduler() {
+    const modal = document.getElementById(MODAL_ID);
+    if (!modal) return;
+    modal.classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  function ensureButtons() {
+    ensureStyles();
+    const actions = document.querySelector('.topbar .actions');
+    if (actions && !document.getElementById('novaScheduleBtn')) {
+      const button = document.createElement('button');
+      button.id = 'novaScheduleBtn';
+      button.type = 'button';
+      button.className = 'btn secondary nova-schedule-btn';
+      button.textContent = 'Schedule';
+      button.title = 'Book a meeting with Cal.com';
+      button.onclick = openScheduler;
+      if (calendarBtn?.parentNode === actions) actions.insertBefore(button, calendarBtn.nextSibling);
+      else actions.prepend(button);
+    }
+
+    const dashButtons = document.querySelector('.dashbuttons');
+    if (dashButtons && !document.getElementById('novaScheduleTodayBtn')) {
+      const button = document.createElement('button');
+      button.id = 'novaScheduleTodayBtn';
+      button.type = 'button';
+      button.className = 'btn nova-schedule-accent';
+      button.textContent = 'Book time';
+      button.title = 'Open Cal.com scheduler';
+      button.onclick = openScheduler;
+      dashButtons.appendChild(button);
+    }
+  }
+
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') closeScheduler();
+  });
+
+  ensureButtons();
+  setTimeout(ensureButtons, 300);
+  setTimeout(ensureButtons, 1000);
+  const observer = new MutationObserver(ensureButtons);
+  observer.observe(document.body, { childList: true, subtree: true });
+})();
