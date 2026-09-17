@@ -1,13 +1,43 @@
-/* NOVA built-in calendar: local CRUD + ICS import/export + Add to Google Calendar. */
+/* NOVA unified calendar: local CRUD + Cal.com + ICS import/export + Google handoff. */
 (() => {
   'use strict';
 
+  const CAL_URL = 'https://cal.com/reeta-devi-op8mu0';
   let editingEventId = null;
 
   function requireUser() {
     if (currentUser) return true;
     openAuth('login');
     return false;
+  }
+
+  function addUnifiedStyles() {
+    if (document.getElementById('novaUnifiedCalendarStyles')) return;
+    const style = document.createElement('style');
+    style.id = 'novaUnifiedCalendarStyles';
+    style.textContent = `
+      #novaScheduleBtn,#novaScheduleTodayBtn{display:none!important}
+      .nova-calendar-options{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:18px}
+      .nova-calendar-option{display:flex;align-items:flex-start;gap:11px;text-align:left;padding:14px;border:1px solid var(--line);border-radius:16px;background:var(--surface);color:var(--ink);cursor:pointer;transition:.18s}
+      .nova-calendar-option:hover{transform:translateY(-1px);border-color:color-mix(in srgb,var(--accent) 45%,var(--line));box-shadow:0 8px 24px rgba(65,55,88,.08)}
+      .nova-calendar-option.featured{background:linear-gradient(135deg,#efe7ff,#dfeaff);border-color:rgba(120,105,160,.22)}
+      .nova-calendar-option .cal-icon{width:34px;height:34px;display:grid;place-items:center;flex:0 0 34px;border-radius:11px;background:var(--soft);color:var(--accent);font-weight:800;font-size:12px}
+      .nova-calendar-option b{display:block;font-size:12px;margin-bottom:3px}.nova-calendar-option small{display:block;font-size:10px;line-height:1.45;color:var(--muted)}
+      .nova-calendar-note{margin-top:14px;padding:11px 12px;border-radius:13px;background:var(--surface2);font-size:10px;line-height:1.5;color:var(--muted)}
+      body.dark .nova-calendar-option.featured{background:linear-gradient(135deg,#413650,#35465d)}
+      @media(max-width:600px){.nova-calendar-options{grid-template-columns:1fr}}
+    `;
+    document.head.appendChild(style);
+  }
+
+  function forceUnifiedButton() {
+    if (!calendarBtn) return;
+    calendarBtn.disabled = false;
+    calendarBtn.textContent = 'Add to calendar';
+    calendarBtn.title = 'Calendar, Cal.com and .ics options';
+    calendarBtn.setAttribute('aria-label', 'Add to calendar');
+    document.getElementById('novaScheduleBtn')?.remove();
+    document.getElementById('novaScheduleTodayBtn')?.remove();
   }
 
   function ensureEventFields() {
@@ -26,12 +56,8 @@
     }
 
     const actions = card.querySelector('.modal-actions');
-    if (actions && !$('deleteEventBtn')) {
-      actions.insertAdjacentHTML('afterbegin', '<button id="deleteEventBtn" class="btn danger" style="display:none;margin-right:auto">Delete</button>');
-    }
-    if (actions && !$('googleEventBtn')) {
-      actions.insertAdjacentHTML('afterbegin', '<button id="googleEventBtn" class="btn secondary" style="display:none">Add to Google Calendar</button>');
-    }
+    if (actions && !$('deleteEventBtn')) actions.insertAdjacentHTML('afterbegin', '<button id="deleteEventBtn" class="btn danger" style="display:none;margin-right:auto">Delete</button>');
+    if (actions && !$('googleEventBtn')) actions.insertAdjacentHTML('afterbegin', '<button id="googleEventBtn" class="btn secondary" style="display:none">Add to Google Calendar</button>');
   }
 
   function ensureToolsModal() {
@@ -41,17 +67,18 @@
         <div class="modal-card">
           <div class="inline">
             <div>
-              <h2>Calendar</h2>
-              <p>Your NOVA calendar works without connecting a Google account.</p>
+              <h2>Add to calendar</h2>
+              <p>Choose how you want to schedule, import, export or manage calendar time.</p>
             </div>
             <button id="closeCalendarTools" class="btn secondary">Close</button>
           </div>
-          <div style="display:grid;gap:10px;margin-top:18px">
-            <button id="importIcsBtn" class="btn secondary">Import Calendar (.ics)</button>
-            <button id="exportIcsBtn" class="btn secondary">Export Calendar (.ics)</button>
-            <button id="newCalendarEventBtn" class="btn primary">+ Add NOVA event</button>
+          <div class="nova-calendar-options">
+            <button id="newCalendarEventBtn" class="nova-calendar-option featured" type="button"><span class="cal-icon">N</span><span><b>NOVA Calendar</b><small>Add a fixed event directly to your NOVA planner.</small></span></button>
+            <button id="calComBtn" class="nova-calendar-option" type="button"><span class="cal-icon">C</span><span><b>Cal.com</b><small>Book or share available meeting times.</small></span></button>
+            <button id="importIcsBtn" class="nova-calendar-option" type="button"><span class="cal-icon">↓</span><span><b>Import .ics</b><small>Bring events in from Google, Apple, Outlook or another calendar.</small></span></button>
+            <button id="exportIcsBtn" class="nova-calendar-option" type="button"><span class="cal-icon">↑</span><span><b>Export .ics</b><small>Download your NOVA events for use in another calendar app.</small></span></button>
           </div>
-          <p style="margin-top:14px">Import works with standard iCalendar files from Google Calendar, Apple Calendar, Outlook and other calendar apps. Export creates a standard .ics file you can import elsewhere.</p>
+          <div class="nova-calendar-note"><b>Google Calendar:</b> create or open a NOVA event, then choose <b>Add to Google Calendar</b>. This keeps the handoff simple without requiring full account sync.</div>
           <div id="calendarToolsNotice" class="notice"></div>
           <input id="icsFileInput" type="file" accept=".ics,text/calendar" style="display:none">
         </div>
@@ -62,13 +89,13 @@
       $('calendarToolsModal').classList.remove('open');
       openCalendarEvent();
     };
+    $('calComBtn').onclick = () => window.open(CAL_URL, '_blank', 'noopener,noreferrer');
     $('importIcsBtn').onclick = () => $('icsFileInput').click();
     $('exportIcsBtn').onclick = () => exportCalendar();
     $('icsFileInput').onchange = async event => {
       const file = event.target.files?.[0];
       event.target.value = '';
-      if (!file) return;
-      await importCalendarFile(file);
+      if (file) await importCalendarFile(file);
     };
   }
 
@@ -80,17 +107,14 @@
   }
 
   renderCalendarButton = function () {
-    if (!calendarBtn) return;
-    calendarBusy = false;
     calendarConnected = false;
-    calendarBtn.disabled = false;
-    calendarBtn.textContent = 'Calendar';
-    calendarBtn.title = 'Import, export or manage your NOVA calendar';
+    calendarBusy = false;
+    forceUnifiedButton();
   };
 
   refreshCalendarStatus = async function () {
     calendarConnected = false;
-    renderCalendarButton();
+    forceUnifiedButton();
   };
 
   calendarBtn.onclick = showCalendarTools;
@@ -140,24 +164,17 @@
       location: $('eventLocation').value.trim() || null,
       description: $('eventDescription').value.trim() || null,
       is_fixed: true,
-      sync_status: 'local',
+      sync_status: 'local'
     };
 
     $('saveEvent').disabled = true;
     notice($('eventNotice'), editingEventId ? 'Saving changes…' : 'Saving in NOVA…');
     try {
       if (editingEventId) {
-        const { error } = await sb.from('calendar_events')
-          .update(payload)
-          .eq('id', editingEventId)
-          .eq('user_id', currentUser.id);
+        const { error } = await sb.from('calendar_events').update(payload).eq('id', editingEventId).eq('user_id', currentUser.id);
         if (error) throw error;
       } else {
-        const { error } = await sb.from('calendar_events').insert({
-          user_id: currentUser.id,
-          ...payload,
-          provider: 'manual',
-        });
+        const { error } = await sb.from('calendar_events').insert({ user_id: currentUser.id, ...payload, provider: 'manual' });
         if (error) throw error;
       }
       eventModal.classList.remove('open');
@@ -172,14 +189,13 @@
   };
 
   function googleCalendarUrl(event) {
-    const clean = value => String(value || '');
     const stamp = value => new Date(value).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
     const url = new URL('https://calendar.google.com/calendar/render');
     url.searchParams.set('action', 'TEMPLATE');
-    url.searchParams.set('text', clean(event.title));
+    url.searchParams.set('text', String(event.title || ''));
     url.searchParams.set('dates', `${stamp(event.starts_at)}/${stamp(event.ends_at)}`);
-    if (event.description) url.searchParams.set('details', clean(event.description));
-    if (event.location) url.searchParams.set('location', clean(event.location));
+    if (event.description) url.searchParams.set('details', String(event.description));
+    if (event.location) url.searchParams.set('location', String(event.location));
     return url.toString();
   }
 
@@ -193,8 +209,7 @@
   }
 
   $('googleEventBtn').onclick = async () => {
-    if (!editingEventId) return;
-    await addEventToGoogle(editingEventId);
+    if (editingEventId) await addEventToGoogle(editingEventId);
   };
 
   document.addEventListener('click', async event => {
@@ -219,27 +234,17 @@
 
     const editButton = event.target.closest?.('[data-event-edit]');
     if (editButton) {
-      try {
-        const fullEvent = await getFullEvent(editButton.dataset.eventEdit);
-        openCalendarEvent(fullEvent);
-      } catch (error) {
-        calendarNotice(error?.message || 'Could not open the calendar event.', true);
-      }
+      try { openCalendarEvent(await getFullEvent(editButton.dataset.eventEdit)); }
+      catch (error) { calendarNotice(error?.message || 'Could not open the calendar event.', true); }
       return;
     }
 
     const googleButton = event.target.closest?.('[data-event-google]');
-    if (googleButton) {
-      await addEventToGoogle(googleButton.dataset.eventGoogle);
-    }
+    if (googleButton) await addEventToGoogle(googleButton.dataset.eventGoogle);
   });
 
   function unescapeIcsText(value = '') {
-    return value
-      .replace(/\\n/gi, '\n')
-      .replace(/\\,/g, ',')
-      .replace(/\\;/g, ';')
-      .replace(/\\\\/g, '\\');
+    return value.replace(/\\n/gi, '\n').replace(/\\,/g, ',').replace(/\\;/g, ';').replace(/\\\\/g, '\\');
   }
 
   function parseProperty(line) {
@@ -257,79 +262,37 @@
     return { name, params, value };
   }
 
-  function zonedTimeToUtc(parts, timeZone) {
-    let utc = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
-    try {
-      const formatter = new Intl.DateTimeFormat('en-US', {
-        timeZone,
-        year: 'numeric', month: '2-digit', day: '2-digit',
-        hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
-      });
-      for (let i = 0; i < 3; i++) {
-        const observed = {};
-        for (const p of formatter.formatToParts(new Date(utc))) {
-          if (p.type !== 'literal') observed[p.type] = Number(p.value);
-        }
-        const observedUtc = Date.UTC(observed.year, observed.month - 1, observed.day, observed.hour, observed.minute, observed.second);
-        const desiredUtc = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
-        const diff = desiredUtc - observedUtc;
-        utc += diff;
-        if (!diff) break;
-      }
-    } catch (_) {}
-    return new Date(utc);
-  }
-
   function parseIcsDate(value, params = {}) {
-    const dateOnly = params.VALUE === 'DATE' || /^\d{8}$/.test(value);
-    if (dateOnly) {
-      const y = Number(value.slice(0, 4));
-      const m = Number(value.slice(4, 6));
-      const d = Number(value.slice(6, 8));
+    if (params.VALUE === 'DATE' || /^\d{8}$/.test(value)) {
+      const y = Number(value.slice(0,4)), m = Number(value.slice(4,6)), d = Number(value.slice(6,8));
       return { date: new Date(y, m - 1, d), allDay: true };
     }
-
     const match = value.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})?(Z)?$/);
     if (!match) return null;
-    const parts = {
-      year: Number(match[1]), month: Number(match[2]), day: Number(match[3]),
-      hour: Number(match[4]), minute: Number(match[5]), second: Number(match[6] || 0),
-    };
-    if (match[7] === 'Z') {
-      return { date: new Date(Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second)), allDay: false };
-    }
-    if (params.TZID) return { date: zonedTimeToUtc(parts, params.TZID), allDay: false };
-    return { date: new Date(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second), allDay: false };
+    const y=+match[1],m=+match[2],d=+match[3],h=+match[4],min=+match[5],s=+(match[6]||0);
+    return { date: match[7] === 'Z' ? new Date(Date.UTC(y,m-1,d,h,min,s)) : new Date(y,m-1,d,h,min,s), allDay:false };
   }
 
   function parseIcs(text) {
-    const unfolded = text.replace(/\r?\n[ \t]/g, '');
-    const lines = unfolded.split(/\r?\n/);
+    const lines = text.replace(/\r?\n[ \t]/g, '').split(/\r?\n/);
     const events = [];
     let current = null;
-
     for (const raw of lines) {
       const line = raw.trimEnd();
-      if (line === 'BEGIN:VEVENT') {
-        current = {};
-        continue;
-      }
+      if (line === 'BEGIN:VEVENT') { current = {}; continue; }
       if (line === 'END:VEVENT') {
         if (current?.DTSTART) {
           const start = parseIcsDate(current.DTSTART.value, current.DTSTART.params);
           const end = current.DTEND ? parseIcsDate(current.DTEND.value, current.DTEND.params) : null;
           if (start?.date && !Number.isNaN(start.date.getTime())) {
-            let endDate = end?.date;
-            if (!endDate || Number.isNaN(endDate.getTime())) {
-              endDate = new Date(start.date.getTime() + (start.allDay ? 86400000 : 3600000));
-            }
+            const endDate = end?.date && !Number.isNaN(end.date.getTime()) ? end.date : new Date(start.date.getTime() + (start.allDay ? 86400000 : 3600000));
             events.push({
               uid: current.UID ? unescapeIcsText(current.UID.value) : null,
               title: current.SUMMARY ? unescapeIcsText(current.SUMMARY.value) : 'Imported event',
               description: current.DESCRIPTION ? unescapeIcsText(current.DESCRIPTION.value) : null,
               location: current.LOCATION ? unescapeIcsText(current.LOCATION.value) : null,
               starts_at: start.date.toISOString(),
-              ends_at: endDate.toISOString(),
+              ends_at: endDate.toISOString()
             });
           }
         }
@@ -338,8 +301,7 @@
       }
       if (!current) continue;
       const prop = parseProperty(line);
-      if (!prop) continue;
-      if (['UID', 'SUMMARY', 'DESCRIPTION', 'LOCATION', 'DTSTART', 'DTEND'].includes(prop.name)) current[prop.name] = prop;
+      if (prop && ['UID','SUMMARY','DESCRIPTION','LOCATION','DTSTART','DTEND'].includes(prop.name)) current[prop.name] = prop;
     }
     return events;
   }
@@ -349,12 +311,9 @@
     const status = $('calendarToolsNotice');
     notice(status, `Reading ${file.name}…`);
     try {
-      const text = await file.text();
-      const parsed = parseIcs(text);
+      const parsed = parseIcs(await file.text());
       if (!parsed.length) throw new Error('No valid calendar events were found in this .ics file.');
-
-      let added = 0;
-      let updated = 0;
+      let added = 0, updated = 0;
       for (const item of parsed) {
         const record = {
           user_id: currentUser.id,
@@ -367,17 +326,10 @@
           provider: 'ics',
           sync_status: 'local',
           calendar_id: 'ics-import',
-          external_event_id: item.uid,
+          external_event_id: item.uid
         };
-
         if (item.uid) {
-          const { data: existing, error: lookupError } = await sb.from('calendar_events')
-            .select('id')
-            .eq('user_id', currentUser.id)
-            .eq('provider', 'ics')
-            .eq('calendar_id', 'ics-import')
-            .eq('external_event_id', item.uid)
-            .maybeSingle();
+          const { data: existing, error: lookupError } = await sb.from('calendar_events').select('id').eq('user_id', currentUser.id).eq('provider','ics').eq('calendar_id','ics-import').eq('external_event_id', item.uid).maybeSingle();
           if (lookupError) throw lookupError;
           if (existing?.id) {
             const { user_id, ...changes } = record;
@@ -387,12 +339,10 @@
             continue;
           }
         }
-
         const { error } = await sb.from('calendar_events').insert(record);
         if (error) throw error;
         added++;
       }
-
       await loadDashboard();
       notice(status, `Calendar imported · ${added} added${updated ? ` · ${updated} updated` : ''}.`);
       calendarNotice(`Imported ${added + updated} calendar event${added + updated === 1 ? '' : 's'} into NOVA.`);
@@ -402,15 +352,11 @@
   }
 
   function escapeIcsText(value = '') {
-    return String(value)
-      .replace(/\\/g, '\\\\')
-      .replace(/\r?\n/g, '\\n')
-      .replace(/,/g, '\\,')
-      .replace(/;/g, '\\;');
+    return String(value).replace(/\\/g,'\\\\').replace(/\r?\n/g,'\\n').replace(/,/g,'\\,').replace(/;/g,'\\;');
   }
 
   function icsStamp(value) {
-    return new Date(value).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+    return new Date(value).toISOString().replace(/[-:]/g,'').replace(/\.\d{3}Z$/,'Z');
   }
 
   async function exportCalendar() {
@@ -418,14 +364,10 @@
     const status = $('calendarToolsNotice');
     notice(status, 'Preparing calendar export…');
     try {
-      const { data: events, error } = await sb.from('calendar_events')
-        .select('id,title,description,location,starts_at,ends_at,external_event_id')
-        .eq('user_id', currentUser.id)
-        .order('starts_at', { ascending: true });
+      const { data: events, error } = await sb.from('calendar_events').select('id,title,description,location,starts_at,ends_at,external_event_id').eq('user_id',currentUser.id).order('starts_at',{ascending:true});
       if (error) throw error;
       if (!events?.length) throw new Error('There are no NOVA calendar events to export yet.');
-
-      const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//NOVA//Focus Planner//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH'];
+      const lines = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//NOVA//Focus Planner//EN','CALSCALE:GREGORIAN','METHOD:PUBLISH'];
       for (const event of events) {
         lines.push('BEGIN:VEVENT');
         lines.push(`UID:${escapeIcsText(event.external_event_id || `nova-${event.id}@nova`)}`);
@@ -438,15 +380,12 @@
         lines.push('END:VEVENT');
       }
       lines.push('END:VCALENDAR');
-
-      const blob = new Blob([lines.join('\r\n') + '\r\n'], { type: 'text/calendar;charset=utf-8' });
+      const blob = new Blob([lines.join('\r\n') + '\r\n'], {type:'text/calendar;charset=utf-8'});
       const href = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = href;
-      a.download = `nova-calendar-${new Date().toISOString().slice(0, 10)}.ics`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
+      a.download = `nova-calendar-${new Date().toISOString().slice(0,10)}.ics`;
+      document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(href), 1000);
       notice(status, `Exported ${events.length} event${events.length === 1 ? '' : 's'} as .ics.`);
     } catch (error) {
@@ -468,31 +407,31 @@
       if (!actions) continue;
       if (!actions.querySelector('[data-event-edit]')) {
         const edit = document.createElement('button');
-        edit.className = 'mini';
-        edit.dataset.eventEdit = candidate.id;
-        edit.textContent = 'Edit';
-        edit.title = 'Edit this NOVA calendar event';
+        edit.className = 'mini'; edit.dataset.eventEdit = candidate.id; edit.textContent = 'Edit'; edit.title = 'Edit this NOVA calendar event';
         actions.appendChild(edit);
       }
       if (!actions.querySelector('[data-event-google]')) {
         const google = document.createElement('button');
-        google.className = 'mini';
-        google.dataset.eventGoogle = candidate.id;
-        google.textContent = 'Google';
-        google.title = 'Add this event to Google Calendar';
+        google.className = 'mini'; google.dataset.eventGoogle = candidate.id; google.textContent = 'Google'; google.title = 'Add this event to Google Calendar';
         actions.appendChild(google);
       }
     }
   };
 
+  addUnifiedStyles();
   ensureEventFields();
   ensureToolsModal();
-  renderCalendarButton();
+  forceUnifiedButton();
   calendarConnected = false;
+
+  setTimeout(forceUnifiedButton, 250);
+  setTimeout(forceUnifiedButton, 800);
+  const observer = new MutationObserver(forceUnifiedButton);
+  observer.observe(document.body, { childList:true, subtree:true, characterData:true });
 
   sb.auth.onAuthStateChange((_event, session) => {
     setTimeout(() => {
-      renderCalendarButton();
+      forceUnifiedButton();
       if (!session?.user) $('calendarToolsModal')?.classList.remove('open');
     }, 0);
   });
