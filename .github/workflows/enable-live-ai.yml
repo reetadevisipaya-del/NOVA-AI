@@ -1,86 +1,23 @@
-name: Enable live NOVA AI
+name: NOVA final sanity check
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/enable-live-ai.yml'
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  patch:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Patch index.html
+      - name: Verify required NOVA files
         run: |
-          python - <<'PY'
-          from pathlib import Path
-          import re
-
-          p = Path('index.html')
-          s = p.read_text()
-
-          s = s.replace(
-            'Uses your planner context · <b>response language is still prototype logic</b>',
-            'Uses your planner context · <b>Live AI planning assistant</b>'
-          )
-
-          pattern = re.compile(r"function reply\(q\)\{.*?document\.querySelectorAll\('\[data-q\]'\)\.forEach\(b=>b\.onclick=\(\)=>sendQ\(b\.dataset\.q\)\);", re.S)
-
-          replacement = r'''async function getConversationId(){
-  let r=await sb.from('ai_conversations').select('id').eq('user_id',currentUser.id).order('updated_at',{ascending:false}).limit(1).maybeSingle();
-  if(r.data?.id)return r.data.id;
-  let c=await sb.from('ai_conversations').insert({user_id:currentUser.id,title:'NOVA Assistant'}).select('id').single();
-  return c.data?.id||null;
-}
-async function saveChat(role,content){
-  if(!currentUser)return;
-  try{
-    let cid=await getConversationId();
-    if(cid)await sb.from('ai_messages').insert({conversation_id:cid,user_id:currentUser.id,role,content});
-  }catch(e){console.warn('Chat history save failed',e)}
-}
-function addMsg(t,w){let d=document.createElement('div');d.className='msg '+w;d.innerHTML=t;messages.appendChild(d);messages.scrollTop=messages.scrollHeight;return d}
-async function sendQ(q){
-  q=(q||'').trim();
-  if(!q)return;
-  if(!currentUser){addMsg('Please sign in so I can use your private NOVA planner context.','bot');openAuth('login');return}
-  addMsg(esc(q),'user');
-  await saveChat('user',q);
-  const thinking=addMsg('Thinking with your current plan…','bot');
-  try{
-    const {data,error}=await sb.functions.invoke('nova-assistant',{body:{message:q}});
-    thinking.remove();
-    if(error)throw error;
-    if(data?.error)throw new Error(data.error);
-    const answer=(data?.answer||'I could not generate a response right now.').trim();
-    addMsg(esc(answer).replace(/\n/g,'<br>'),'bot');
-    await saveChat('assistant',answer);
-  }catch(e){
-    thinking.remove();
-    console.error('NOVA AI error',e);
-    addMsg('I could not reach the live AI assistant. Check the Supabase Edge Function logs and OpenAI API billing/key settings, then try again.','bot');
-  }
-}
-$('send').onclick=()=>{let q=chatInput.value;chatInput.value='';sendQ(q)};
-chatInput.onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();let q=e.target.value;e.target.value='';sendQ(q)}};
-document.querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>sendQ(b.dataset.q));'''
-
-          s2, n = pattern.subn(replacement, s, count=1)
-          if n != 1:
-            raise SystemExit(f'Expected to replace assistant logic once, replaced {n}')
-
-          p.write_text(s2)
-          PY
-      - name: Commit live AI wiring
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add index.html
-          git diff --cached --quiet && exit 0
-          git commit -m "Connect NOVA Assistant to Supabase Edge Function"
-          git push
+          test -s index.html
+          test -s calendar-sync.js
+          test -s calendar-universal.js
+          test -s nova-journal.js
+          test -s nova-journal.css
+          grep -q "NOVA Assistant" index.html
+          grep -q "ensureBackend" index.html
+          echo "NOVA final files verified."
