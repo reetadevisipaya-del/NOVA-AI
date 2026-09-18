@@ -18,7 +18,7 @@ body.dark{--bg:#171a1f;--surface:#20242a;--surface2:#2b3037;--ink:#f4f1ea;--mute
 .taskrow{display:grid;grid-template-columns:1fr auto;gap:10px;padding:12px 0;border-bottom:1px solid var(--line)}.taskrow b{font-size:12px}.taskrow small{display:block;color:var(--muted);font-size:9px;margin-top:4px}.rowactions{display:flex;gap:6px;align-items:center}.toolbar-note{font-size:9px;color:var(--muted);margin-top:6px}
 @media(max-width:950px){.welcome,.setup,.dashboard{grid-template-columns:1fr}.welcome{padding:30px}.stage{min-height:480px}.values{margin-top:35px}.dashboard .assistant{min-height:520px}}@media(max-width:560px){.app{padding:10px}.welcome{padding:22px}.welcome h1{font-size:46px}.setup-main,.setup-side,.dash,.assistant{padding:18px}.choices,.values,.two{grid-template-columns:1fr}.dashhead{align-items:flex-start;flex-direction:column}.openbook{min-height:520px}.openpages{padding:26px 20px 28px 34px}.auth-status{display:none}.topbar{align-items:flex-start}.actions{max-width:72%}}
 </style>
-<link rel="stylesheet" href="nova-journal.css?v=20260918-backendfix">
+<link rel="stylesheet" href="nova-journal.css?v=20260918-final">
 </head>
 <body>
 <div class="app">
@@ -32,7 +32,6 @@ body.dark{--bg:#171a1f;--surface:#20242a;--surface2:#2b3037;--ink:#f4f1ea;--mute
 <div id="taskModal" class="modal"><div class="modal-card"><h2 id="taskModalTitle">Add a task</h2><p>Give NOVA enough context to place the task realistically.</p><div class="field"><label>Task</label><input id="taskTitle" placeholder="e.g. Finish case study"></div><div class="two"><div class="field"><label>Project</label><div class="inline"><select id="taskProject" style="flex:1"></select><button id="newProjectBtn" class="btn secondary" type="button">+</button></div></div><div class="field"><label>Goal</label><div class="inline"><select id="taskGoal" style="flex:1"></select><button id="newGoalBtn" class="btn secondary" type="button">+</button></div></div></div><div class="field"><label>Due date / time</label><input id="taskDue" type="datetime-local"></div><div class="two"><div class="field"><label>Priority</label><select id="taskPriority"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option><option value="urgent">Urgent</option></select></div><div class="field"><label>Estimated minutes</label><input id="taskMinutes" type="number" min="5" step="5" value="30"></div></div><label class="checkrow"><input id="taskFlexible" type="checkbox" checked> Flexible — NOVA may move this around fixed commitments</label><div id="taskNotice" class="notice"></div><div class="modal-actions"><button id="deleteTaskBtn" class="btn danger" style="display:none;margin-right:auto">Delete</button><button id="closeTask" class="btn secondary">Cancel</button><button id="saveTask" class="btn primary">Save task</button></div></div></div>
 <div id="eventModal" class="modal"><div class="modal-card"><h2>Add fixed calendar event</h2><p>Fixed events block time so NOVA does not schedule focus work on top of them.</p><div class="field"><label>Event</label><input id="eventTitle" placeholder="e.g. Research meeting"></div><div class="two"><div class="field"><label>Starts</label><input id="eventStart" type="datetime-local"></div><div class="field"><label>Ends</label><input id="eventEnd" type="datetime-local"></div></div><div id="eventNotice" class="notice"></div><div class="modal-actions"><button id="closeEvent" class="btn secondary">Cancel</button><button id="saveEvent" class="btn primary">Save event</button></div></div></div>
 <div id="manageModal" class="modal"><div class="modal-card"><h2>Manage tasks</h2><p>Edit, complete or delete tasks. Changes are stored in Supabase.</p><div id="manageList" style="margin-top:12px"></div><div class="modal-actions"><button id="closeManage" class="btn secondary">Close</button></div></div></div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL='https://kjeqeqwaqfxqyikjzzvv.supabase.co', SUPABASE_PUBLISHABLE_KEY='sb_publishable_dOINmOh01-0VZ0LROx-4Ag_EXvFQgd1';
 let sb=null,backendReady=null;
@@ -183,7 +182,7 @@ refreshSummary();renderDemo();
   <span aria-hidden="true"> · </span>
   <span>Calendar data is used only for user-requested planning features.</span>
 </div>
-<script src="calendar-sync.js?v=20260918-backendfix"></script>
-<script src="calendar-universal.js?v=20260918-backendfix"></script>
-<script src="nova-journal.js?v=20260918-backendfix"></script>
+<script src="calendar-sync.js?v=20260918-final"></script>
+<script src="calendar-universal.js?v=20260918-final"></script>
+<script src="nova-journal.js?v=20260918-final"></script>
 </body></html>
