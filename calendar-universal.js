@@ -4,18 +4,8 @@
 (() => {
   'use strict';
 
-  const STABLE_BUNDLE = 'https://cdn.jsdelivr.net/gh/reetadevisipaya-del/NOVA-AI@5e654d994d7361b0f55db74ef70ed287ba11eaf4/calendar-universal.js';
   const STYLE_ID = 'novaFinalActionStyles';
   const CREATE_MODAL_ID = 'novaCreateChoiceModal';
-
-  function loadStableBundle(done) {
-    const script = document.createElement('script');
-    script.src = STABLE_BUNDLE;
-    script.async = false;
-    script.onload = () => done();
-    script.onerror = () => done();
-    document.head.appendChild(script);
-  }
 
   function ensureStyles() {
     if (document.getElementById(STYLE_ID)) return;
@@ -219,5 +209,5 @@
     });
   }
 
-  loadStableBundle(initRefinement);
+  initRefinement();
 })();
