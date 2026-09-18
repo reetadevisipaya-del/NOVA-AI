@@ -429,10 +429,15 @@
 
   // Do not observe and rewrite the whole DOM here. That caused a self-triggering
   // MutationObserver loop which could freeze NOVA and make every control unresponsive.
-  sb.auth.onAuthStateChange((_event, session) => {
+  const attachCalendarAuthHook = client => client?.auth?.onAuthStateChange?.((_event, session) => {
     setTimeout(() => {
       forceUnifiedButton();
       if (!session?.user) $('calendarToolsModal')?.classList.remove('open');
     }, 0);
   });
+  if (typeof ensureBackend === 'function') {
+    ensureBackend().then(attachCalendarAuthHook).catch(error => console.warn('Calendar auth hook unavailable', error));
+  } else if (typeof sb !== 'undefined' && sb?.auth) {
+    attachCalendarAuthHook(sb);
+  }
 })();
