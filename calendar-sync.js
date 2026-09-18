@@ -426,9 +426,9 @@
 
   setTimeout(forceUnifiedButton, 250);
   setTimeout(forceUnifiedButton, 800);
-  const observer = new MutationObserver(forceUnifiedButton);
-  observer.observe(document.body, { childList:true, subtree:true, characterData:true });
 
+  // Do not observe and rewrite the whole DOM here. That caused a self-triggering
+  // MutationObserver loop which could freeze NOVA and make every control unresponsive.
   sb.auth.onAuthStateChange((_event, session) => {
     setTimeout(() => {
       forceUnifiedButton();
