@@ -118,7 +118,7 @@ body.dark .welcome h1{color:var(--ink)}
 .diary{
   width:min(520px,88%)!important;
   height:360px!important;
-  transform:rotateX(6deg) rotateY(-5deg) rotateZ(-1deg)!important;
+  transform:rotateX(10deg) rotateY(-7deg) rotateZ(-2deg);
   filter:drop-shadow(0 36px 34px rgba(77,65,104,.19));
 }
 .cover{
@@ -224,10 +224,20 @@ body.dark .welcome h1{color:var(--ink)}
 }
 @media(max-width:700px){
   .app{padding:12px!important}.topbar{align-items:flex-start!important}.actions{max-width:76%}
-  .welcome{padding:26px!important;grid-template-columns:1fr!important}.welcome h1{font-size:44px!important}.values{grid-template-columns:1fr!important}.stage{min-height:470px!important}.diary{height:300px!important;transform:none!important}
+  .welcome{padding:26px!important;grid-template-columns:1fr!important}.welcome h1{font-size:44px!important}.values{grid-template-columns:1fr!important}.stage{min-height:470px!important}.diary{height:300px!important;transform:rotateX(8deg) rotateY(-6deg) rotateZ(-1deg)}
   .dash,.assistant{padding:17px!important}.dashhead{align-items:flex-start!important;flex-direction:column!important}.dashhead h1{font-size:38px!important}
   .nova-inspiration-row{grid-template-columns:1fr!important}.nova-art-card{min-height:140px}.nova-daily-quote{font-size:18px}
   .openbook{width:100%!important;min-height:700px!important;transform:none!important;filter:none!important}.openbook:before{left:-4px;right:-4px;top:-8px;bottom:-10px}.openpages{padding:26px 20px 30px 30px!important}
   .journal-entry-toolbar{align-items:flex-start!important;flex-direction:column!important}.journal-entry-toolbar button{width:100%}.entry-grid{grid-template-columns:1fr!important}.entry-grid .wide{grid-column:auto!important}.journal-footer{align-items:stretch!important;flex-direction:column!important}#generateBtn,.journal-add-again{width:100%}
   .auth-status{display:none!important}
+}
+
+
+/* Final NOVA interaction safeguards */
+.diary{transform-style:preserve-3d!important;will-change:transform}
+.stage{perspective:1500px!important}
+.cover{transform:translateZ(35px)!important}
+.tabs{transform:translateZ(45px)!important}
+@media (prefers-reduced-motion:reduce){
+  .diary{transition:none!important}
 }
