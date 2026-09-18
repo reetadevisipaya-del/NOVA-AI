@@ -51,7 +51,7 @@ async function ensureBackend(){
   backendReady=(async()=>{
     if(!window.supabase?.createClient){
       try{await loadExternalScript('https://unpkg.com/@supabase/supabase-js@2.116.0/dist/umd/supabase.js');}
-      catch(_e){await loadExternalScript('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.min.js');}
+      catch(_e){await loadExternalScript('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.js');}
     }
     if(!window.supabase?.createClient)throw new Error('NOVA could not load its sign-in service. Please check your connection and refresh.');
     sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
