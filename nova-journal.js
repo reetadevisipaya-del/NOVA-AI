@@ -443,12 +443,17 @@
   ensureJournalControls();
   ensureLegacyTaskColorField();
 
-  sb.auth.onAuthStateChange((_event, session) => {
+  const attachJournalAuth = client => client?.auth?.onAuthStateChange?.((_event, session) => {
     setTimeout(() => {
       ensureJournalControls();
       if (!session?.user) closeEntryComposer();
     }, 0);
   });
+  if (typeof ensureBackend === 'function') {
+    ensureBackend().then(attachJournalAuth).catch(error => console.warn('Journal auth hook unavailable', error));
+  } else if (typeof sb !== 'undefined' && sb?.auth) {
+    attachJournalAuth(sb);
+  }
 })();
 
 /* NOVA inspiration shelf: personalized daily quotes + lightweight original art. */
@@ -677,8 +682,11 @@
 
   mountInspiration();
   setTimeout(mountInspiration, 250);
-  if (typeof sb !== 'undefined' && sb?.auth?.onAuthStateChange) {
-    sb.auth.onAuthStateChange(() => setTimeout(() => { mountInspiration(); renderQuote(); }, 50));
+  const attachInspirationAuth = client => client?.auth?.onAuthStateChange?.(() => setTimeout(() => { mountInspiration(); renderQuote(); }, 50));
+  if (typeof ensureBackend === 'function') {
+    ensureBackend().then(attachInspirationAuth).catch(error => console.warn('Inspiration auth hook unavailable', error));
+  } else if (typeof sb !== 'undefined' && sb?.auth) {
+    attachInspirationAuth(sb);
   }
   const observer = new MutationObserver(() => {
     if (document.querySelector('#s3.screen.active')) mountInspiration();
