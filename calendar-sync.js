@@ -57,7 +57,6 @@
 
     const actions = card.querySelector('.modal-actions');
     if (actions && !$('deleteEventBtn')) actions.insertAdjacentHTML('afterbegin', '<button id="deleteEventBtn" class="btn danger" style="display:none;margin-right:auto">Delete</button>');
-    if (actions && !$('googleEventBtn')) actions.insertAdjacentHTML('afterbegin', '<button id="googleEventBtn" class="btn secondary" style="display:none">Add to Google Calendar</button>');
   }
 
   function ensureToolsModal() {
@@ -78,7 +77,7 @@
             <button id="importIcsBtn" class="nova-calendar-option" type="button"><span class="cal-icon">↓</span><span><b>Import .ics</b><small>Bring events in from Google, Apple, Outlook or another calendar.</small></span></button>
             <button id="exportIcsBtn" class="nova-calendar-option" type="button"><span class="cal-icon">↑</span><span><b>Export .ics</b><small>Download your NOVA events for use in another calendar app.</small></span></button>
           </div>
-          <div class="nova-calendar-note"><b>Google Calendar:</b> create or open a NOVA event, then choose <b>Add to Google Calendar</b>. This keeps the handoff simple without requiring full account sync.</div>
+          <div class="nova-calendar-note"><b>Cal.com:</b> use the Cal.com option for booking and availability. NOVA Calendar keeps fixed commitments inside your planner, while .ics import/export supports other calendar apps.</div>
           <div id="calendarToolsNotice" class="notice"></div>
           <input id="icsFileInput" type="file" accept=".ics,text/calendar" style="display:none">
         </div>
@@ -141,7 +140,6 @@
     $('eventLocation').value = event?.location || '';
     $('eventDescription').value = event?.description || '';
     $('deleteEventBtn').style.display = event ? 'inline-block' : 'none';
-    $('googleEventBtn').style.display = event ? 'inline-block' : 'none';
     clearNotice($('eventNotice'));
     eventModal.classList.add('open');
   }
@@ -188,30 +186,6 @@
     }
   };
 
-  function googleCalendarUrl(event) {
-    const stamp = value => new Date(value).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
-    const url = new URL('https://calendar.google.com/calendar/render');
-    url.searchParams.set('action', 'TEMPLATE');
-    url.searchParams.set('text', String(event.title || ''));
-    url.searchParams.set('dates', `${stamp(event.starts_at)}/${stamp(event.ends_at)}`);
-    if (event.description) url.searchParams.set('details', String(event.description));
-    if (event.location) url.searchParams.set('location', String(event.location));
-    return url.toString();
-  }
-
-  async function addEventToGoogle(id) {
-    try {
-      const fullEvent = await getFullEvent(id);
-      window.open(googleCalendarUrl(fullEvent), '_blank', 'noopener,noreferrer');
-    } catch (error) {
-      calendarNotice(error?.message || 'Could not open Google Calendar.', true);
-    }
-  }
-
-  $('googleEventBtn').onclick = async () => {
-    if (editingEventId) await addEventToGoogle(editingEventId);
-  };
-
   document.addEventListener('click', async event => {
     const deleteButton = event.target.closest?.('#deleteEventBtn');
     if (deleteButton) {
@@ -239,8 +213,6 @@
       return;
     }
 
-    const googleButton = event.target.closest?.('[data-event-google]');
-    if (googleButton) await addEventToGoogle(googleButton.dataset.eventGoogle);
   });
 
   function unescapeIcsText(value = '') {
@@ -409,11 +381,6 @@
         const edit = document.createElement('button');
         edit.className = 'mini'; edit.dataset.eventEdit = candidate.id; edit.textContent = 'Edit'; edit.title = 'Edit this NOVA calendar event';
         actions.appendChild(edit);
-      }
-      if (!actions.querySelector('[data-event-google]')) {
-        const google = document.createElement('button');
-        google.className = 'mini'; google.dataset.eventGoogle = candidate.id; google.textContent = 'Google'; google.title = 'Add this event to Google Calendar';
-        actions.appendChild(google);
       }
     }
   };
