@@ -207,8 +207,11 @@
     // The dashboard/topbar already exist in the document, so initial sync + auth
     // updates are enough. A document-wide observer here can retrigger itself while
     // adding/removing controls and lock the main thread.
-    if (typeof sb !== 'undefined' && sb?.auth?.onAuthStateChange) {
-      sb.auth.onAuthStateChange(() => setTimeout(syncTopControls,0));
+    const attachUiAuthHook = client => client?.auth?.onAuthStateChange?.(() => setTimeout(syncTopControls,0));
+    if (typeof ensureBackend === 'function') {
+      ensureBackend().then(attachUiAuthHook).catch(error => console.warn('NOVA action auth hook unavailable', error));
+    } else if (typeof sb !== 'undefined' && sb?.auth) {
+      attachUiAuthHook(sb);
     }
 
     document.addEventListener('keydown', event => {
