@@ -204,12 +204,9 @@
     setTimeout(syncTopControls,650);
     setTimeout(syncTodayCalendarButton,700);
 
-    const observer = new MutationObserver(() => {
-      syncTopControls();
-      syncTodayCalendarButton();
-    });
-    observer.observe(document.body,{childList:true,subtree:true});
-
+    // The dashboard/topbar already exist in the document, so initial sync + auth
+    // updates are enough. A document-wide observer here can retrigger itself while
+    // adding/removing controls and lock the main thread.
     if (typeof sb !== 'undefined' && sb?.auth?.onAuthStateChange) {
       sb.auth.onAuthStateChange(() => setTimeout(syncTopControls,0));
     }
