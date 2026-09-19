@@ -18,7 +18,7 @@ body.dark{--bg:#171a1f;--surface:#20242a;--surface2:#2b3037;--ink:#f4f1ea;--mute
 .taskrow{display:grid;grid-template-columns:1fr auto;gap:10px;padding:12px 0;border-bottom:1px solid var(--line)}.taskrow b{font-size:12px}.taskrow small{display:block;color:var(--muted);font-size:9px;margin-top:4px}.rowactions{display:flex;gap:6px;align-items:center}.toolbar-note{font-size:9px;color:var(--muted);margin-top:6px}
 @media(max-width:950px){.welcome,.setup,.dashboard{grid-template-columns:1fr}.welcome{padding:30px}.stage{min-height:480px}.values{margin-top:35px}.dashboard .assistant{min-height:520px}}@media(max-width:560px){.app{padding:10px}.welcome{padding:22px}.welcome h1{font-size:46px}.setup-main,.setup-side,.dash,.assistant{padding:18px}.choices,.values,.two{grid-template-columns:1fr}.dashhead{align-items:flex-start;flex-direction:column}.openbook{min-height:520px}.openpages{padding:26px 20px 28px 34px}.auth-status{display:none}.topbar{align-items:flex-start}.actions{max-width:72%}}
 </style>
-<link rel="stylesheet" href="nova-journal.css?v=20260918-final2">
+<link rel="stylesheet" href="nova-journal.css?v=20260919-rewards">
 </head>
 <body>
 <div class="app">
@@ -70,15 +70,105 @@ function setAuthUI(){let on=!!currentUser;authStatus.textContent=on?(currentUser
 async function loadProfile(){if(!currentUser)return;const {data}=await sb.from('profiles').select('*').eq('id',currentUser.id).maybeSingle();if(data){setChoice('role',data.routine_type);setChoice('goal',data.primary_planning_goal);setChoice('predict',data.day_predictability);hours.value=String(Math.max(1,Math.min(6,Math.round((data.daily_focus_minutes||180)/60))));hoursLabel.textContent=hours.value+'h';statHours.textContent=hours.value+'h';greeting.textContent='Good morning'+(data.full_name?`, ${data.full_name.split(' ')[0]}`:'')+'.';refreshSummary();if(data.onboarding_completed)show(3)}}async function saveProfile(){const payload={id:currentUser.id,routine_type:selected('role'),primary_planning_goal:selected('goal'),day_predictability:selected('predict'),daily_focus_minutes:Number(hours.value)*60,onboarding_completed:true};let {error}=await sb.from('profiles').upsert(payload,{onConflict:'id'});if(error)throw error} $('finish').onclick=async()=>{if(!currentUser){openAuth('signup');return}try{await saveProfile();show(3);await loadDashboard()}catch(e){alert(e.message)}};
 async function loadMeta(){if(!currentUser)return;const [pr,go]=await Promise.all([sb.from('projects').select('id,name,status').eq('user_id',currentUser.id).eq('status','active').order('name'),sb.from('goals').select('id,title,project_id,is_active').eq('user_id',currentUser.id).eq('is_active',true).order('title')]);currentProjects=pr.data||[];currentGoals=go.data||[];$('taskProject').innerHTML='<option value="">No project</option>'+currentProjects.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('');$('taskGoal').innerHTML='<option value="">No goal</option>'+currentGoals.map(x=>`<option value="${x.id}">${esc(x.title)}</option>`).join('')}
 $('newProjectBtn').onclick=async()=>{if(!currentUser)return;let name=prompt('Project name');if(!name?.trim())return;let {error}=await sb.from('projects').insert({user_id:currentUser.id,name:name.trim()});if(error)return alert(error.message);await loadMeta();$('taskProject').value=currentProjects.find(x=>x.name===name.trim())?.id||''};$('newGoalBtn').onclick=async()=>{if(!currentUser)return;let title=prompt('Goal name');if(!title?.trim())return;let {error}=await sb.from('goals').insert({user_id:currentUser.id,title:title.trim(),scope:'project',project_id:$('taskProject').value||null});if(error)return alert(error.message);await loadMeta();$('taskGoal').value=currentGoals.find(x=>x.title===title.trim())?.id||''};
-function openTask(task=null){editingTaskId=task?.id||null;$('taskModalTitle').textContent=task?'Edit task':'Add a task';$('taskTitle').value=task?.title||'';$('taskProject').value=task?.project_id||'';$('taskGoal').value=task?.goal_id||'';$('taskDue').value=isoLocalInput(task?.due_at);$('taskPriority').value=task?.priority||'medium';$('taskMinutes').value=task?.estimated_minutes||30;$('taskFlexible').checked=task?.is_flexible!==false;$('deleteTaskBtn').style.display=task?'inline-block':'none';clearNotice($('taskNotice'));taskModal.classList.add('open')}addTaskBtn.onclick=async()=>{await loadMeta();openTask()};$('closeTask').onclick=()=>taskModal.classList.remove('open');$('saveTask').onclick=async()=>{let title=$('taskTitle').value.trim();if(!title)return notice($('taskNotice'),'Add a task title.',true);let row={user_id:currentUser.id,title,project_id:$('taskProject').value||null,goal_id:$('taskGoal').value||null,due_at:$('taskDue').value?new Date($('taskDue').value).toISOString():null,priority:$('taskPriority').value,estimated_minutes:Number($('taskMinutes').value)||30,is_flexible:$('taskFlexible').checked};let q=editingTaskId?sb.from('tasks').update(row).eq('id',editingTaskId).eq('user_id',currentUser.id):sb.from('tasks').insert(row),{error}=await q;if(error)return notice($('taskNotice'),error.message,true);taskModal.classList.remove('open');await loadDashboard();if(manageModal.classList.contains('open'))renderManage()};$('deleteTaskBtn').onclick=async()=>{if(!editingTaskId||!confirm('Delete this task?'))return;let {error}=await sb.from('tasks').delete().eq('id',editingTaskId).eq('user_id',currentUser.id);if(error)return alert(error.message);taskModal.classList.remove('open');await loadDashboard()};
+function showTaskReward(title){
+  const reward=$('taskReward'),name=$('rewardTaskName'),count=$('rewardCount');
+  const total=Number(localStorage.getItem('novaFocusStars')||0)+1;
+  localStorage.setItem('novaFocusStars',String(total));
+  name.textContent=title?'“'+title+'” is complete.':'Nice work — you finished it.';
+  count.textContent='+1 Focus Star · '+total+' total';
+  reward.classList.add('show');reward.setAttribute('aria-hidden','false');
+  clearTimeout(showTaskReward._timer);
+  showTaskReward._timer=setTimeout(()=>{reward.classList.remove('show');reward.setAttribute('aria-hidden','true')},2200);
+}
+async function deleteTaskById(id){
+  if(!id||!currentUser)return;
+  const p=await sb.from('daily_plan_items').delete().eq('task_id',id).eq('user_id',currentUser.id);
+  if(p.error)throw p.error;
+  const d=await sb.from('tasks').delete().eq('id',id).eq('user_id',currentUser.id);
+  if(d.error)throw d.error;
+}
+async function completeAndDeleteTask(id,title='Task'){
+  if(!id||!currentUser)return;
+  const done=await sb.from('tasks').update({status:'done',completed_at:new Date().toISOString()}).eq('id',id).eq('user_id',currentUser.id);
+  if(done.error)throw done.error;
+  await deleteTaskById(id);
+  showTaskReward(title);
+  if(editingTaskId===id){editingTaskId=null;taskModal.classList.remove('open')}
+  await loadDashboard();
+  if(manageModal.classList.contains('open'))renderManage();
+}
+function openTask(task=null){
+  editingTaskId=task?.id||null;
+  $('taskModalTitle').textContent=task?'Edit task':'Add a task';
+  $('taskTitle').value=task?.title||'';$('taskProject').value=task?.project_id||'';$('taskGoal').value=task?.goal_id||'';
+  $('taskDue').value=isoLocalInput(task?.due_at);$('taskPriority').value=task?.priority||'medium';
+  $('taskMinutes').value=task?.estimated_minutes||30;$('taskCompletion').value='not_completed';
+  $('taskFlexible').checked=task?.is_flexible!==false;$('deleteTaskBtn').style.display=task?'inline-block':'none';
+  clearNotice($('taskNotice'));taskModal.classList.add('open')
+}
+addTaskBtn.onclick=async()=>{await loadMeta();openTask()};
+$('closeTask').onclick=()=>taskModal.classList.remove('open');
+$('saveTask').onclick=async()=>{
+  const title=$('taskTitle').value.trim();
+  if(!title)return notice($('taskNotice'),'Add a task title.',true);
+  $('saveTask').disabled=true;
+  try{
+    const row={user_id:currentUser.id,title,project_id:$('taskProject').value||null,goal_id:$('taskGoal').value||null,due_at:$('taskDue').value?new Date($('taskDue').value).toISOString():null,priority:$('taskPriority').value,estimated_minutes:Number($('taskMinutes').value)||30,is_flexible:$('taskFlexible').checked,status:'todo',completed_at:null};
+    let id=editingTaskId;
+    if(editingTaskId){
+      const q=await sb.from('tasks').update(row).eq('id',editingTaskId).eq('user_id',currentUser.id);
+      if(q.error)throw q.error;
+    }else{
+      const q=await sb.from('tasks').insert(row).select('id').single();
+      if(q.error)throw q.error;id=q.data.id;
+    }
+    if($('taskCompletion').value==='completed'){await completeAndDeleteTask(id,title);return}
+    taskModal.classList.remove('open');await loadDashboard();if(manageModal.classList.contains('open'))renderManage();
+  }catch(error){notice($('taskNotice'),error?.message||'Could not save the task.',true)}
+  finally{$('saveTask').disabled=false}
+};
+$('deleteTaskBtn').onclick=async()=>{
+  if(!editingTaskId||!confirm('Delete this task?'))return;
+  try{await deleteTaskById(editingTaskId);editingTaskId=null;taskModal.classList.remove('open');await loadDashboard();if(manageModal.classList.contains('open'))renderManage()}
+  catch(error){alert(error?.message||'Could not delete the task.')}
+};
 addEventBtn.onclick=()=>{let now=new Date(),later=new Date(now.getTime()+60*60000);$('eventTitle').value='';$('eventStart').value=isoLocalInput(now);$('eventEnd').value=isoLocalInput(later);clearNotice($('eventNotice'));eventModal.classList.add('open')};$('closeEvent').onclick=()=>eventModal.classList.remove('open');$('saveEvent').onclick=async()=>{let title=$('eventTitle').value.trim(),s=$('eventStart').value,e=$('eventEnd').value;if(!title||!s||!e)return notice($('eventNotice'),'Add title, start and end.',true);if(new Date(e)<=new Date(s))return notice($('eventNotice'),'End must be after start.',true);let {error}=await sb.from('calendar_events').insert({user_id:currentUser.id,title,starts_at:new Date(s).toISOString(),ends_at:new Date(e).toISOString(),is_fixed:true,provider:'manual'});if(error)return notice($('eventNotice'),error.message,true);eventModal.classList.remove('open');await loadDashboard()};
-manageBtn.onclick=async()=>{await loadDashboard();renderManage();manageModal.classList.add('open')};$('closeManage').onclick=()=>manageModal.classList.remove('open');function renderManage(){if(!currentTasks.length){$('manageList').innerHTML='<div class="empty-plan">No open tasks.</div>';return}$('manageList').innerHTML=currentTasks.map(t=>`<div class="taskrow"><div><b>${esc(t.title)}</b><small>${esc(t.priority)} · ${t.estimated_minutes||30} min · ${esc(fmtDateTime(t.due_at))}</small></div><div class="rowactions"><button class="mini" data-edit="${t.id}">Edit</button><button class="mini" data-done="${t.id}">Done</button></div></div>`).join('');document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>{let t=currentTasks.find(x=>x.id===b.dataset.edit);manageModal.classList.remove('open');openTask(t)});document.querySelectorAll('[data-done]').forEach(b=>b.onclick=async()=>{await sb.from('tasks').update({status:'done',completed_at:new Date().toISOString()}).eq('id',b.dataset.done).eq('user_id',currentUser.id);await loadDashboard();renderManage()})}
+manageBtn.onclick=async()=>{await loadDashboard();renderManage();manageModal.classList.add('open')};
+$('closeManage').onclick=()=>manageModal.classList.remove('open');
+function renderManage(){
+  if(!currentTasks.length){$('manageList').innerHTML='<div class="empty-plan">No open tasks. Your list is clear ✦</div>';return}
+  $('manageList').innerHTML=currentTasks.map(t=>'<div class="taskrow"><div><b>'+esc(t.title)+'</b><small>'+esc(t.priority)+' · '+(t.estimated_minutes||30)+' min · '+esc(fmtDateTime(t.due_at))+'</small></div><div class="rowactions"><select class="mini task-state-select" data-task-state="'+t.id+'" aria-label="Task completion status"><option value="not_completed" selected>Not completed</option><option value="completed">Completed ✓</option></select><button class="mini" data-edit="'+t.id+'">Edit</button><button class="mini danger-lite" data-delete="'+t.id+'">Delete</button></div></div>').join('');
+  document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>{const t=currentTasks.find(x=>x.id===b.dataset.edit);manageModal.classList.remove('open');openTask(t)});
+  document.querySelectorAll('[data-task-state]').forEach(s=>s.onchange=async()=>{if(s.value!=='completed')return;const t=currentTasks.find(x=>x.id===s.dataset.taskState);s.disabled=true;try{await completeAndDeleteTask(s.dataset.taskState,t?.title||'Task')}catch(error){s.disabled=false;s.value='not_completed';alert(error?.message||'Could not complete the task.')}});
+  document.querySelectorAll('[data-delete]').forEach(b=>b.onclick=async()=>{const t=currentTasks.find(x=>x.id===b.dataset.delete);if(!confirm('Delete “'+(t?.title||'this task')+'”?'))return;b.disabled=true;try{await deleteTaskById(b.dataset.delete);await loadDashboard();renderManage()}catch(error){b.disabled=false;alert(error?.message||'Could not delete the task.')}});
+}
 function priorityScore(p){return({urgent:80,high:55,medium:30,low:15})[p]||20}function taskScore(t){let s=priorityScore(t.priority),why=[`${t.priority} priority`];if(t.due_at){let h=(new Date(t.due_at)-Date.now())/36e5;if(h<0){s+=70;why.push('overdue')}else if(h<=24){s+=55;why.push('due within 24h')}else if(h<=72){s+=35;why.push('due within 3 days')}else if(h<=168){s+=18;why.push('due this week')}}if(t.goal_id){s+=10;why.push('linked to a goal')}if(t.is_flexible===false){s+=8;why.push('fixed task')}return{score:s,why:why.join(' · ')}}
 function freeWindows(day,events,startMin=540,endMin=1080){let blocks=events.map(e=>({s:Math.max(startMin,mins(new Date(e.starts_at))),e:Math.min(endMin,mins(new Date(e.ends_at)))})).filter(x=>x.e>x.s).sort((a,b)=>a.s-b.s),out=[],cursor=startMin;for(const b of blocks){if(b.s>cursor)out.push({s:cursor,e:b.s});cursor=Math.max(cursor,b.e)}if(cursor<endMin)out.push({s:cursor,e:endMin});return out}
 async function generatePlan(){if(!currentUser)return openAuth('login');await loadDashboard(false);if(!currentTasks.length){$('planNote').textContent='Add at least one open task first.';return}generateBtn.disabled=true;generateBtn.textContent='Planning…';try{const {data:profile}=await sb.from('profiles').select('daily_focus_minutes,preferred_work_start,preferred_work_end').eq('id',currentUser.id).maybeSingle(),cap=profile?.daily_focus_minutes||180,day=new Date(),today=localDateString(day);let startMin=540,endMin=1080;if(profile?.preferred_work_start){let [h,m]=profile.preferred_work_start.split(':').map(Number);startMin=h*60+m}if(profile?.preferred_work_end){let [h,m]=profile.preferred_work_end.split(':').map(Number);endMin=h*60+m}let windows=freeWindows(day,currentEvents,startMin,endMin),tasks=[...currentTasks].map(t=>({...t,...taskScore(t)})).sort((a,b)=>b.score-a.score),remainingCap=cap,items=[];for(const t of tasks){if(remainingCap<=0)break;let need=Math.min(t.estimated_minutes||30,remainingCap);for(let wi=0;wi<windows.length&&need>0;wi++){let w=windows[wi],available=w.e-w.s;if(available<15)continue;let block=Math.min(need,available),start=fromMins(day,w.s),end=fromMins(day,w.s+block);items.push({user_id:currentUser.id,item_type:'task',task_id:t.id,title:t.title,starts_at:start.toISOString(),ends_at:end.toISOString(),sort_order:items.length,rationale:`${t.why}. Scheduled into an open ${block}-minute focus window.`,is_locked:t.is_flexible===false});w.s+=block;need-=block;remainingCap-=block}}
 let {data:plan,error}=await sb.from('daily_plans').upsert({user_id:currentUser.id,plan_date:today,generated_at:new Date().toISOString(),status:'suggested',summary:`Planned ${cap-remainingCap} of ${cap} available focus minutes`,total_focus_minutes:cap-remainingCap,total_fixed_minutes:currentEvents.reduce((a,e)=>a+Math.max(0,(new Date(e.ends_at)-new Date(e.starts_at))/60000),0)},{onConflict:'user_id,plan_date'}).select('id').single();if(error)throw error;await sb.from('daily_plan_items').delete().eq('plan_id',plan.id).eq('user_id',currentUser.id);if(items.length){items=items.map(x=>({...x,plan_id:plan.id}));let r=await sb.from('daily_plan_items').insert(items);if(r.error)throw r.error}await loadDashboard();$('planNote').textContent=`NOVA scheduled ${cap-remainingCap} minutes around ${currentEvents.length} fixed event${currentEvents.length===1?'':'s'}.`;}catch(e){alert('Planner error: '+e.message)}finally{generateBtn.disabled=false;generateBtn.textContent='Generate Today plan'}}generateBtn.onclick=generatePlan;
 async function loadDashboard(render=true){if(!currentUser){renderDemo();return}let today=localDateString(),start=new Date(today+'T00:00:00').toISOString(),end=new Date(today+'T23:59:59').toISOString();const [tr,er,pr,dr]=await Promise.all([sb.from('tasks').select('id,title,description,project_id,goal_id,priority,due_at,estimated_minutes,status,is_flexible').eq('user_id',currentUser.id).neq('status','done').order('created_at',{ascending:false}),sb.from('calendar_events').select('id,title,starts_at,ends_at,is_fixed').eq('user_id',currentUser.id).gte('starts_at',start).lte('starts_at',end).order('starts_at'),sb.from('profiles').select('full_name,daily_focus_minutes').eq('id',currentUser.id).maybeSingle(),sb.from('daily_plans').select('id,summary,total_focus_minutes').eq('user_id',currentUser.id).eq('plan_date',today).maybeSingle()]);currentTasks=tr.data||[];currentEvents=er.data||[];if(pr.data){if(pr.data.full_name)greeting.textContent='Good morning, '+pr.data.full_name.split(' ')[0]+'.';statHours.textContent=Math.round((pr.data.daily_focus_minutes||180)/60)+'h'}taskCount.textContent=currentTasks.length;meetingCount.textContent=currentEvents.length;currentPlanItems=[];if(dr.data){let ir=await sb.from('daily_plan_items').select('*').eq('plan_id',dr.data.id).eq('user_id',currentUser.id).order('sort_order');currentPlanItems=ir.data||[];$('planNote').textContent=dr.data.summary||'Generated plan'}if(render)renderPlan();await loadMeta()}
-function renderPlan(){let items=[];currentEvents.forEach(e=>items.push({kind:'event',title:e.title,starts_at:e.starts_at,ends_at:e.ends_at,rationale:'Fixed calendar commitment.'}));currentPlanItems.forEach(p=>items.push({...p,kind:'task'}));items.sort((a,b)=>new Date(a.starts_at)-new Date(b.starts_at));if(!items.length){planList.innerHTML='<div class="empty-plan">No generated plan yet. Add tasks and click <b>Generate Today plan</b>.</div>';activeFocusTask=currentTasks[0]||null}else{planList.innerHTML=items.map((it,i)=>{let isTask=it.kind==='task',task=isTask?currentTasks.find(t=>t.id===it.task_id):null,color=isTask?'#5c8b7d':'#6b889b';return `<div><div class="plan"><span class="bar" style="background:${color}"></span><div><b>${esc(it.title)}</b><small>${isTask?(esc(task?.priority||'task')+' · '+Math.round((new Date(it.ends_at)-new Date(it.starts_at))/60000)+' min'):'Calendar · fixed'}</small></div><div class="plan-actions"><time>${esc(fmtTime(it.starts_at))}</time>${isTask?`<button class="mini" data-why="${i}">Why?</button>`:''}</div></div><div id="why-${i}" class="whybox" style="display:none">${esc(it.rationale||'Placed based on priority, deadline, available time and focus capacity.')}</div></div>`}).join('');document.querySelectorAll('[data-why]').forEach(b=>b.onclick=()=>{let x=$('why-'+b.dataset.why);x.style.display=x.style.display==='none'?'block':'none'});let first=currentPlanItems.find(p=>currentTasks.some(t=>t.id===p.task_id));activeFocusTask=first?currentTasks.find(t=>t.id===first.task_id):currentTasks[0]||null}focusLabel.textContent=activeFocusTask?`${activeFocusTask.title} · 25 min`:'No open task · 25 min'}function renderDemo(){planList.innerHTML='<div class="empty-plan">Sign in to create a real plan. Preview mode does not save data.</div>';taskCount.textContent='0';meetingCount.textContent='0';activeFocusTask=null;focusLabel.textContent='No task selected · 25 min'}
+function renderPlan(){
+  let items=[];
+  currentEvents.forEach(e=>items.push({kind:'event',title:e.title,starts_at:e.starts_at,ends_at:e.ends_at,rationale:'Fixed calendar commitment.'}));
+  currentPlanItems.forEach(p=>items.push({...p,kind:'task'}));
+  items.sort((a,b)=>new Date(a.starts_at)-new Date(b.starts_at));
+  if(!items.length){
+    planList.innerHTML='<div class="empty-plan">No generated plan yet. Add tasks and click <b>Generate Today plan</b>.</div>';
+    activeFocusTask=currentTasks[0]||null;
+  }else{
+    planList.innerHTML=items.map((it,i)=>{
+      const isTask=it.kind==='task',task=isTask?currentTasks.find(t=>t.id===it.task_id):null,color=isTask?'#5c8b7d':'#6b889b';
+      const controls=isTask&&task?'<button class="mini complete-mini" data-plan-complete="'+task.id+'">✓ Complete</button><button class="mini" data-why="'+i+'">Why?</button>':'';
+      return '<div><div class="plan"><span class="bar" style="background:'+color+'"></span><div><b>'+esc(it.title)+'</b><small>'+(isTask?(esc(task?.priority||'task')+' · '+Math.round((new Date(it.ends_at)-new Date(it.starts_at))/60000)+' min'):'Calendar · fixed')+'</small></div><div class="plan-actions"><time>'+esc(fmtTime(it.starts_at))+'</time>'+controls+'</div></div><div id="why-'+i+'" class="whybox" style="display:none">'+esc(it.rationale||'Placed based on priority, deadline, available time and focus capacity.')+'</div></div>';
+    }).join('');
+    document.querySelectorAll('[data-why]').forEach(b=>b.onclick=()=>{const x=$('why-'+b.dataset.why);x.style.display=x.style.display==='none'?'block':'none'});
+    document.querySelectorAll('[data-plan-complete]').forEach(b=>b.onclick=async()=>{const t=currentTasks.find(x=>x.id===b.dataset.planComplete);b.disabled=true;b.textContent='Completing…';try{await completeAndDeleteTask(b.dataset.planComplete,t?.title||'Task')}catch(error){b.disabled=false;b.textContent='✓ Complete';alert(error?.message||'Could not complete the task.')}});
+    const first=currentPlanItems.find(p=>currentTasks.some(t=>t.id===p.task_id));
+    activeFocusTask=first?currentTasks.find(t=>t.id===first.task_id):currentTasks[0]||null;
+  }
+  focusLabel.textContent=activeFocusTask?activeFocusTask.title+' · 25 min':'No open task · 25 min';
+}
+function renderDemo(){planList.innerHTML='<div class="empty-plan">Sign in to create a real plan. Preview mode does not save data.</div>';taskCount.textContent='0';meetingCount.textContent='0';activeFocusTask=null;focusLabel.textContent='No task selected · 25 min'}
 focusBtn.onclick=async()=>{if(!currentUser)return openAuth('login');if(focusInterval){clearInterval(focusInterval);focusInterval=null;focusBtn.textContent='Start';focusTimer.textContent='Paused';if(focusSessionId)await sb.from('focus_sessions').update({ended_at:new Date().toISOString(),status:'stopped'}).eq('id',focusSessionId).eq('user_id',currentUser.id);focusSessionId=null;return}if(!activeFocusTask)return alert('Add or generate a task first.');let {data,error}=await sb.from('focus_sessions').insert({user_id:currentUser.id,task_id:activeFocusTask.id,planned_minutes:25,status:'active'}).select('id').single();if(error)return alert(error.message);focusSessionId=data.id;focusEndsAt=Date.now()+25*60*1000;focusBtn.textContent='Stop';let tick=async()=>{let left=Math.max(0,focusEndsAt-Date.now()),m=Math.floor(left/60000),s=Math.floor((left%60000)/1000);focusTimer.textContent=`${m}:${String(s).padStart(2,'0')} remaining`;if(left<=0){clearInterval(focusInterval);focusInterval=null;focusBtn.textContent='Start';focusTimer.textContent='Session complete';await sb.from('focus_sessions').update({ended_at:new Date().toISOString(),completed_minutes:25,status:'completed'}).eq('id',focusSessionId).eq('user_id',currentUser.id);focusSessionId=null}};tick();focusInterval=setInterval(tick,1000)};
 async function getConversationId(){let r=await sb.from('ai_conversations').select('id').eq('user_id',currentUser.id).order('updated_at',{ascending:false}).limit(1).maybeSingle();if(r.data?.id)return r.data.id;let c=await sb.from('ai_conversations').insert({user_id:currentUser.id,title:'NOVA Assistant'}).select('id').single();return c.data?.id||null}
 async function saveChat(role,content){if(!currentUser)return;try{let cid=await getConversationId();if(cid)await sb.from('ai_messages').insert({conversation_id:cid,user_id:currentUser.id,role,content})}catch(e){console.warn('Chat history save failed',e)}}
@@ -183,7 +273,7 @@ refreshSummary();renderDemo();
   <span aria-hidden="true"> · </span>
   <span>Calendar data is used only for user-requested planning features.</span>
 </div>
-<script src="calendar-sync.js?v=20260918-final2"></script>
-<script src="calendar-universal.js?v=20260918-final2"></script>
-<script src="nova-journal.js?v=20260918-final2"></script>
+<script src="calendar-sync.js?v=20260919-rewards"></script>
+<script src="calendar-universal.js?v=20260919-rewards"></script>
+<script src="nova-journal.js?v=20260919-rewards"></script>
 </body></html>
