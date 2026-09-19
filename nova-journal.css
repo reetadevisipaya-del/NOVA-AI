@@ -241,3 +241,22 @@ body.dark .welcome h1{color:var(--ink)}
 @media (prefers-reduced-motion:reduce){
   .diary{transition:none!important}
 }
+
+
+/* NOVA task completion reward */
+.task-reward{position:fixed;inset:0;z-index:12000;display:grid;place-items:center;padding:20px;background:rgba(35,29,48,.24);backdrop-filter:blur(5px);opacity:0;pointer-events:none;transition:opacity .18s ease}
+.task-reward.show{opacity:1}
+.task-reward-card{width:min(390px,92vw);padding:30px 26px;text-align:center;border-radius:28px;background:linear-gradient(145deg,#fffdfb,#f5efff 52%,#eaf4ff);border:1px solid rgba(116,96,151,.2);box-shadow:0 28px 70px rgba(62,48,87,.24);transform:translateY(12px) scale(.97);transition:transform .22s ease;position:relative;overflow:hidden}
+.task-reward.show .task-reward-card{transform:translateY(0) scale(1)}
+.reward-star{width:72px;height:72px;margin:0 auto 12px;display:grid;place-items:center;border-radius:50%;font-size:38px;background:linear-gradient(145deg,#fff2a8,#ffd5e7,#e6dcff);box-shadow:0 12px 28px rgba(101,78,126,.18);animation:novaRewardPop .55s ease both}
+.reward-burst{position:absolute;inset:auto 24px 18px auto;font-size:90px;opacity:.08;transform:rotate(18deg)}
+.task-reward-card small{display:block;font-size:10px;letter-spacing:.18em;font-weight:800;color:var(--muted)}
+.task-reward-card h2{margin:7px 0 8px;font-size:30px}
+.task-reward-card p{margin:0 0 12px!important}
+.task-reward-card b{display:inline-block;padding:8px 13px;border-radius:999px;background:#fff0b7;color:#594b38}
+.task-state-select{min-width:138px;cursor:pointer}
+.complete-mini{background:linear-gradient(135deg,#dff4df,#dcecff)!important;color:#355648!important;font-weight:800!important}
+.danger-lite{background:#fff0f1!important;color:#8d4a54!important}
+body.dark .task-reward-card{background:linear-gradient(145deg,#312a3d,#383248 55%,#293a48)}
+body.dark .task-reward-card b{background:#5d5334;color:#fff6c8}
+@keyframes novaRewardPop{0%{transform:scale(.65) rotate(-12deg);opacity:0}70%{transform:scale(1.12) rotate(5deg);opacity:1}100%{transform:scale(1) rotate(0)}}
