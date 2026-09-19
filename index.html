@@ -18,7 +18,7 @@ body.dark{--bg:#171a1f;--surface:#20242a;--surface2:#2b3037;--ink:#f4f1ea;--mute
 .taskrow{display:grid;grid-template-columns:1fr auto;gap:10px;padding:12px 0;border-bottom:1px solid var(--line)}.taskrow b{font-size:12px}.taskrow small{display:block;color:var(--muted);font-size:9px;margin-top:4px}.rowactions{display:flex;gap:6px;align-items:center}.toolbar-note{font-size:9px;color:var(--muted);margin-top:6px}
 @media(max-width:950px){.welcome,.setup,.dashboard{grid-template-columns:1fr}.welcome{padding:30px}.stage{min-height:480px}.values{margin-top:35px}.dashboard .assistant{min-height:520px}}@media(max-width:560px){.app{padding:10px}.welcome{padding:22px}.welcome h1{font-size:46px}.setup-main,.setup-side,.dash,.assistant{padding:18px}.choices,.values,.two{grid-template-columns:1fr}.dashhead{align-items:flex-start;flex-direction:column}.openbook{min-height:520px}.openpages{padding:26px 20px 28px 34px}.auth-status{display:none}.topbar{align-items:flex-start}.actions{max-width:72%}}
 </style>
-<link rel="stylesheet" href="nova-journal.css?v=20260919-rewards2">
+<link rel="stylesheet" href="nova-journal.css?v=20260919-diarysync">
 </head>
 <body>
 <div class="app">
@@ -146,18 +146,51 @@ function priorityScore(p){return({urgent:80,high:55,medium:30,low:15})[p]||20}fu
 function freeWindows(day,events,startMin=540,endMin=1080){let blocks=events.map(e=>({s:Math.max(startMin,mins(new Date(e.starts_at))),e:Math.min(endMin,mins(new Date(e.ends_at)))})).filter(x=>x.e>x.s).sort((a,b)=>a.s-b.s),out=[],cursor=startMin;for(const b of blocks){if(b.s>cursor)out.push({s:cursor,e:b.s});cursor=Math.max(cursor,b.e)}if(cursor<endMin)out.push({s:cursor,e:endMin});return out}
 async function generatePlan(){if(!currentUser)return openAuth('login');await loadDashboard(false);if(!currentTasks.length){$('planNote').textContent='Add at least one open task first.';return}generateBtn.disabled=true;generateBtn.textContent='Planning…';try{const {data:profile}=await sb.from('profiles').select('daily_focus_minutes,preferred_work_start,preferred_work_end').eq('id',currentUser.id).maybeSingle(),cap=profile?.daily_focus_minutes||180,day=new Date(),today=localDateString(day);let startMin=540,endMin=1080;if(profile?.preferred_work_start){let [h,m]=profile.preferred_work_start.split(':').map(Number);startMin=h*60+m}if(profile?.preferred_work_end){let [h,m]=profile.preferred_work_end.split(':').map(Number);endMin=h*60+m}let windows=freeWindows(day,currentEvents,startMin,endMin),tasks=[...currentTasks].map(t=>({...t,...taskScore(t)})).sort((a,b)=>b.score-a.score),remainingCap=cap,items=[];for(const t of tasks){if(remainingCap<=0)break;let need=Math.min(t.estimated_minutes||30,remainingCap);for(let wi=0;wi<windows.length&&need>0;wi++){let w=windows[wi],available=w.e-w.s;if(available<15)continue;let block=Math.min(need,available),start=fromMins(day,w.s),end=fromMins(day,w.s+block);items.push({user_id:currentUser.id,item_type:'task',task_id:t.id,title:t.title,starts_at:start.toISOString(),ends_at:end.toISOString(),sort_order:items.length,rationale:`${t.why}. Scheduled into an open ${block}-minute focus window.`,is_locked:t.is_flexible===false});w.s+=block;need-=block;remainingCap-=block}}
 let {data:plan,error}=await sb.from('daily_plans').upsert({user_id:currentUser.id,plan_date:today,generated_at:new Date().toISOString(),status:'suggested',summary:`Planned ${cap-remainingCap} of ${cap} available focus minutes`,total_focus_minutes:cap-remainingCap,total_fixed_minutes:currentEvents.reduce((a,e)=>a+Math.max(0,(new Date(e.ends_at)-new Date(e.starts_at))/60000),0)},{onConflict:'user_id,plan_date'}).select('id').single();if(error)throw error;await sb.from('daily_plan_items').delete().eq('plan_id',plan.id).eq('user_id',currentUser.id);if(items.length){items=items.map(x=>({...x,plan_id:plan.id}));let r=await sb.from('daily_plan_items').insert(items);if(r.error)throw r.error}await loadDashboard();$('planNote').textContent=`NOVA scheduled ${cap-remainingCap} minutes around ${currentEvents.length} fixed event${currentEvents.length===1?'':'s'}.`;}catch(e){alert('Planner error: '+e.message)}finally{generateBtn.disabled=false;generateBtn.textContent='Generate Today plan'}}generateBtn.onclick=generatePlan;
-async function loadDashboard(render=true){if(!currentUser){renderDemo();return}let today=localDateString(),start=new Date(today+'T00:00:00').toISOString(),end=new Date(today+'T23:59:59').toISOString();const [tr,er,pr,dr]=await Promise.all([sb.from('tasks').select('id,title,description,project_id,goal_id,priority,due_at,estimated_minutes,status,is_flexible').eq('user_id',currentUser.id).neq('status','done').order('created_at',{ascending:false}),sb.from('calendar_events').select('id,title,starts_at,ends_at,is_fixed').eq('user_id',currentUser.id).gte('starts_at',start).lte('starts_at',end).order('starts_at'),sb.from('profiles').select('full_name,daily_focus_minutes').eq('id',currentUser.id).maybeSingle(),sb.from('daily_plans').select('id,summary,total_focus_minutes').eq('user_id',currentUser.id).eq('plan_date',today).maybeSingle()]);currentTasks=tr.data||[];currentEvents=er.data||[];if(pr.data){if(pr.data.full_name)greeting.textContent='Good morning, '+pr.data.full_name.split(' ')[0]+'.';statHours.textContent=Math.round((pr.data.daily_focus_minutes||180)/60)+'h'}taskCount.textContent=currentTasks.length;meetingCount.textContent=currentEvents.length;currentPlanItems=[];if(dr.data){let ir=await sb.from('daily_plan_items').select('*').eq('plan_id',dr.data.id).eq('user_id',currentUser.id).order('sort_order');currentPlanItems=ir.data||[];$('planNote').textContent=dr.data.summary||'Generated plan'}if(render)renderPlan();await loadMeta()}
+async function loadDashboard(render=true){
+  if(!currentUser){renderDemo();return}
+  const today=localDateString(),start=new Date(today+'T00:00:00').toISOString(),end=new Date(today+'T23:59:59').toISOString();
+  const [tr,er,pr,dr]=await Promise.all([
+    sb.from('tasks').select('id,title,description,project_id,goal_id,priority,due_at,estimated_minutes,status,is_flexible').eq('user_id',currentUser.id).in('status',['todo','in_progress']).order('created_at',{ascending:false}),
+    sb.from('calendar_events').select('id,title,starts_at,ends_at,is_fixed').eq('user_id',currentUser.id).gte('starts_at',start).lte('starts_at',end).order('starts_at'),
+    sb.from('profiles').select('full_name,daily_focus_minutes').eq('id',currentUser.id).maybeSingle(),
+    sb.from('daily_plans').select('id,summary,total_focus_minutes').eq('user_id',currentUser.id).eq('plan_date',today).maybeSingle()
+  ]);
+  currentTasks=tr.data||[];
+  currentEvents=er.data||[];
+  if(pr.data){
+    if(pr.data.full_name)greeting.textContent='Good morning, '+pr.data.full_name.split(' ')[0]+'.';
+    statHours.textContent=Math.round((pr.data.daily_focus_minutes||180)/60)+'h';
+  }
+  taskCount.textContent=currentTasks.length;
+  meetingCount.textContent=currentEvents.length;
+  currentPlanItems=[];
+  if(dr.data){
+    const ir=await sb.from('daily_plan_items').select('*').eq('plan_id',dr.data.id).eq('user_id',currentUser.id).order('sort_order');
+    const rows=ir.data||[];
+    const liveTaskIds=new Set(currentTasks.map(task=>task.id));
+    const staleTaskRows=rows.filter(item=>item.item_type==='task'&&(!item.task_id||!liveTaskIds.has(item.task_id)));
+    currentPlanItems=rows.filter(item=>item.item_type!=='task'||(item.task_id&&liveTaskIds.has(item.task_id)));
+    if(staleTaskRows.length){
+      const staleIds=staleTaskRows.map(item=>item.id);
+      const cleanup=await sb.from('daily_plan_items').delete().in('id',staleIds).eq('user_id',currentUser.id);
+      if(cleanup.error)console.warn('Could not remove stale diary rows',cleanup.error);
+    }
+    $('planNote').textContent=dr.data.summary||'Generated plan';
+  }
+  if(render)renderPlan();
+  await loadMeta();
+}
 function renderPlan(){
   let items=[];
   currentEvents.forEach(e=>items.push({kind:'event',title:e.title,starts_at:e.starts_at,ends_at:e.ends_at,rationale:'Fixed calendar commitment.'}));
-  currentPlanItems.forEach(p=>items.push({...p,kind:'task'}));
+  currentPlanItems.filter(p=>p.item_type!=='task'||currentTasks.some(t=>t.id===p.task_id)).forEach(p=>items.push({...p,kind:p.item_type==='task'?'task':'plan'}));
   items.sort((a,b)=>new Date(a.starts_at)-new Date(b.starts_at));
   if(!items.length){
     planList.innerHTML='<div class="empty-plan">No generated plan yet. Add tasks and click <b>Generate Today plan</b>.</div>';
     activeFocusTask=currentTasks[0]||null;
   }else{
     planList.innerHTML=items.map((it,i)=>{
-      const isTask=it.kind==='task',task=isTask?currentTasks.find(t=>t.id===it.task_id):null,color=isTask?'#5c8b7d':'#6b889b';
+      const isTask=it.kind==='task',task=isTask?currentTasks.find(t=>t.id===it.task_id):null,color=isTask?'#5c8b7d':it.kind==='event'?'#6b889b':'#9a8bc4';
       const controls=isTask&&task?'<button class="mini complete-mini" data-plan-complete="'+task.id+'">✓ Complete</button><button class="mini" data-why="'+i+'">Why?</button>':'';
       return '<div><div class="plan"><span class="bar" style="background:'+color+'"></span><div><b>'+esc(it.title)+'</b><small>'+(isTask?(esc(task?.priority||'task')+' · '+Math.round((new Date(it.ends_at)-new Date(it.starts_at))/60000)+' min'):'Calendar · fixed')+'</small></div><div class="plan-actions"><time>'+esc(fmtTime(it.starts_at))+'</time>'+controls+'</div></div><div id="why-'+i+'" class="whybox" style="display:none">'+esc(it.rationale||'Placed based on priority, deadline, available time and focus capacity.')+'</div></div>';
     }).join('');
@@ -273,7 +306,7 @@ refreshSummary();renderDemo();
   <span aria-hidden="true"> · </span>
   <span>Calendar data is used only for user-requested planning features.</span>
 </div>
-<script src="calendar-sync.js?v=20260919-rewards2"></script>
-<script src="calendar-universal.js?v=20260919-rewards2"></script>
-<script src="nova-journal.js?v=20260919-rewards2"></script>
+<script src="calendar-sync.js?v=20260919-diarysync"></script>
+<script src="calendar-universal.js?v=20260919-diarysync"></script>
+<script src="nova-journal.js?v=20260919-diarysync"></script>
 </body></html>
